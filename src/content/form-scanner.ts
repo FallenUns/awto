@@ -148,20 +148,22 @@ function elementType(el: Fillable): string {
 function buildSelector(el: Fillable, doc: Document): string {
   const id = el.id;
   if (id && isSimpleId(id) && doc.querySelectorAll(`#${cssEscape(id)}`).length === 1) {
-    return `#${id}`;
+    return `#${cssEscape(id)}`;
   }
   const name = el.getAttribute("name");
   if (name) {
-    const matches = doc.querySelectorAll(`[name="${cssEscape(name)}"]`);
+    const escaped = cssEscape(name);
+    const matches = doc.querySelectorAll(`[name="${escaped}"]`);
     if (matches.length === 1) {
-      return `[name="${name}"]`;
+      return `[name="${escaped}"]`;
     }
   }
   const testId = el.getAttribute("data-testid");
   if (testId) {
-    const matches = doc.querySelectorAll(`[data-testid="${cssEscape(testId)}"]`);
+    const escaped = cssEscape(testId);
+    const matches = doc.querySelectorAll(`[data-testid="${escaped}"]`);
     if (matches.length === 1) {
-      return `[data-testid="${testId}"]`;
+      return `[data-testid="${escaped}"]`;
     }
   }
   return buildNthSelector(el);

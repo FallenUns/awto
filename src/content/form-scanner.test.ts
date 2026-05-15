@@ -285,4 +285,56 @@ describe("scanFields", () => {
     const fields = scanFields(document);
     expect(fields[0]?.placeholder).toBeNull();
   });
+
+  it("escapes special characters in ID selector for consistency", () => {
+    setBody(`
+      <form>
+        <input id="field-with-dash" type="text" name="test" />
+      </form>
+    `);
+    const fields = scanFields(document);
+    expect(fields[0]?.selector).toBe("#field-with-dash");
+    const el = document.querySelector(fields[0]?.selector ?? "");
+    expect(el).not.toBeNull();
+  });
+
+  it("escapes double quotes in name attribute selector", () => {
+    setBody(`
+      <form>
+        <input name='foo"bar' type="text" />
+      </form>
+    `);
+    const fields = scanFields(document);
+    expect(fields).toHaveLength(1);
+    const el = document.querySelector(fields[0]?.selector ?? "");
+    expect(el).not.toBeNull();
+    expect(el?.getAttribute("name")).toBe('foo"bar');
+  });
+
+  it("escapes double quotes in data-testid attribute selector", () => {
+    setBody(`
+      <form>
+        <input type="text" name="dup" data-testid='test"id' />
+        <input type="text" name="dup" />
+      </form>
+    `);
+    const fields = scanFields(document);
+    expect(fields).toHaveLength(2);
+    const el = document.querySelector(fields[0]?.selector ?? "");
+    expect(el).not.toBeNull();
+    expect(el?.getAttribute("data-testid")).toBe('test"id');
+  });
+
+  it("escapes backslashes in attribute selectors", () => {
+    setBody(`
+      <form>
+        <input name='foo\\bar' type="text" />
+      </form>
+    `);
+    const fields = scanFields(document);
+    expect(fields).toHaveLength(1);
+    const el = document.querySelector(fields[0]?.selector ?? "");
+    expect(el).not.toBeNull();
+    expect(el?.getAttribute("name")).toBe('foo\\bar');
+  });
 });
