@@ -15,6 +15,7 @@ export class LocalLLMError extends Error {
 export interface LocalCallOpts {
   ollamaUrl: string;
   ollamaModel: string;
+  timeoutMs?: number;
 }
 
 function joinUrl(base: string, path: string): string {
@@ -28,6 +29,7 @@ export async function callLocal(
   opts: LocalCallOpts
 ): Promise<LLMResponse> {
   const url = joinUrl(opts.ollamaUrl, "/api/chat");
+  const timeoutMs = opts.timeoutMs ?? 30000;
   const body = {
     model: opts.ollamaModel,
     stream: false,
@@ -39,18 +41,29 @@ export async function callLocal(
     options: { temperature: 0 },
   };
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   let res: Response;
   try {
     res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      signal: controller.signal,
     });
   } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new LocalLLMError(
+        `Ollama call timed out after ${timeoutMs}ms`,
+        err
+      );
+    }
     throw new LocalLLMError(
       `Failed to reach Ollama at ${opts.ollamaUrl}: ${stringifyError(err)}`,
       err
     );
+  } finally {
+    clearTimeout(timer);
   }
 
   if (!res.ok) {

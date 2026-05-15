@@ -214,4 +214,48 @@ describe("callLocal", () => {
     );
     await expect(callLocal(profile, fields, opts)).rejects.toThrow(/JSON/);
   });
+
+  it(
+    "throws LocalLLMError on timeout",
+    async () => {
+      // Mock fetch to create a promise that rejects when signal is aborted
+      (fetch as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+        (url: string, init?: RequestInit) => {
+          return new Promise((resolve, reject) => {
+            if (init?.signal) {
+              init.signal.addEventListener("abort", () => {
+                const err = new Error("The operation was aborted");
+                (err as any).name = "AbortError";
+                reject(err);
+              });
+            }
+            // If no signal or signal not aborted, never resolve
+          });
+        }
+      );
+      const optsWithTimeout = { ...opts, timeoutMs: 50 };
+      const error = await callLocal(profile, fields, optsWithTimeout).catch(
+        (e) => e
+      );
+      expect(error).toBeInstanceOf(LocalLLMError);
+      expect(error.message).toContain("timed out after 50ms");
+    },
+    { timeout: 500 }
+  );
+
+  it("uses default 30s timeout when timeoutMs is not specified", async () => {
+    const f = vi.fn().mockResolvedValue(
+      mockFetchResponse({
+        ok: true,
+        jsonValue: {
+          message: { content: JSON.stringify(validLLMResponse) },
+        },
+      })
+    );
+    vi.stubGlobal("fetch", f);
+    await callLocal(profile, fields, opts);
+    const call = f.mock.calls[0] as [string, RequestInit];
+    const init = call[1];
+    expect(init.signal).toBeDefined();
+  });
 });
