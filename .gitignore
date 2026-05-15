@@ -3,5 +3,6 @@ dist/
 .vite/
 .DS_Store
 *.log
+.tsbuildinfo
 graphify-out/cache/
 graphify-out/.graphify_python
