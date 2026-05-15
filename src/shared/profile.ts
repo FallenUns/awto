@@ -25,7 +25,7 @@ export type Profile = z.infer<typeof ProfileSchema>;
 
 export const EMPTY_PROFILE: Profile = ProfileSchema.parse({});
 
-const BUILT_IN_KEYS = [
+export const BUILT_IN_KEYS = [
   "firstName",
   "lastName",
   "preferredName",
@@ -42,11 +42,11 @@ const BUILT_IN_KEYS = [
   "workRights",
 ] as const;
 
-type BuiltInKey = (typeof BUILT_IN_KEYS)[number];
+export type BuiltInKey = (typeof BUILT_IN_KEYS)[number];
 
 const BUILT_IN_KEY_SET: ReadonlySet<string> = new Set<string>(BUILT_IN_KEYS);
 
-function isBuiltInKey(key: string): key is BuiltInKey {
+export function isBuiltInKey(key: string): key is BuiltInKey {
   return BUILT_IN_KEY_SET.has(key);
 }
 

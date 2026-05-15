@@ -1,8 +1,10 @@
 import React from "react";
-import ReactDOM from "react-dom/client";
+import { createRoot } from "react-dom/client";
+import { Options } from "./Options";
+import "./styles.css";
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
+createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <div>Awto Options</div>
+    <Options />
   </React.StrictMode>
 );
