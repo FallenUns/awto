@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Awto",
+  "version": "0.1.0",
+  "description": "Smart personal-detail autofill that understands what each field actually means.",
+  "action": {
+    "default_popup": "src/popup/index.html",
+    "default_title": "Awto"
+  },
+  "options_page": "src/options/index.html",
+  "background": {
+    "service_worker": "src/background/service-worker.ts",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/index.ts"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": ["http://localhost:11434/*", "https://api.anthropic.com/*"],
+  "icons": {
+    "16": "src/assets/icon-16.png",
+    "48": "src/assets/icon-48.png",
+    "128": "src/assets/icon-128.png"
+  }
+}
