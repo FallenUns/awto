@@ -20,7 +20,11 @@
     }
   ],
   "permissions": ["storage", "activeTab", "scripting"],
-  "host_permissions": ["http://localhost:11434/*", "https://api.anthropic.com/*"],
+  "host_permissions": [
+    "http://localhost:11434/*",
+    "https://api.anthropic.com/*",
+    "https://nominatim.openstreetmap.org/*"
+  ],
   "icons": {
     "16": "src/assets/icon-16.png",
     "48": "src/assets/icon-48.png",
