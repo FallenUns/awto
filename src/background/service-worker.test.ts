@@ -359,3 +359,27 @@ it("aborts the in-flight controller on port disconnect", async () => {
 
   expect(callHybrid.mock.calls[0]?.[2].signal.aborted).toBe(true);
 });
+
+it("calls chrome.action.openPopup on openPopup message", async () => {
+  const openPopup = vi.fn().mockResolvedValue(undefined);
+  (globalThis as unknown as { chrome: typeof chrome }).chrome = {
+    ...(globalThis as unknown as { chrome: typeof chrome }).chrome,
+    action: { openPopup } as unknown as typeof chrome.action,
+  };
+
+  const reply = await handleMessage({ type: "openPopup" });
+
+  expect(openPopup).toHaveBeenCalled();
+  expect(reply).toEqual({ type: "openPopupResult", ok: true });
+});
+
+it("returns openPopupResult ok=false when chrome.action.openPopup rejects", async () => {
+  const openPopup = vi.fn().mockRejectedValue(new Error("no active tab"));
+  (globalThis as unknown as { chrome: typeof chrome }).chrome = {
+    ...(globalThis as unknown as { chrome: typeof chrome }).chrome,
+    action: { openPopup } as unknown as typeof chrome.action,
+  };
+
+  const reply = await handleMessage({ type: "openPopup" });
+  expect(reply).toEqual({ type: "openPopupResult", ok: false, error: "no active tab" });
+});

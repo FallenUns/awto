@@ -34,7 +34,9 @@ export type AwtoMessage =
       error?: string;
       models?: string[];
       modelInstalled?: boolean;
-    };
+    }
+  | { type: "openPopup" }
+  | { type: "openPopupResult"; ok: boolean; error?: string };
 
 export type AwtoMessageType = AwtoMessage["type"];
 

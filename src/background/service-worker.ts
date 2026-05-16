@@ -86,6 +86,14 @@ export async function handleMessage(
         };
       }
     }
+    case "openPopup": {
+      try {
+        await chrome.action.openPopup();
+        return { type: "openPopupResult", ok: true };
+      } catch (err) {
+        return { type: "openPopupResult", ok: false, error: errorToMessage(err) };
+      }
+    }
     default: {
       const unknownType = (message as { type: string }).type;
       console.warn("Awto: unknown message type", unknownType);
