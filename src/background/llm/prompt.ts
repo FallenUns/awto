@@ -35,6 +35,8 @@ Common label synonyms to map to a single profile key:
 - "Postcode" / "Zip" / "Zip code" / "Postal code" → profile.postcode
 - "Suburb" / "City" / "Town" / "Locality" → profile.suburb or profile.city (whichever you populated)
 
+When the form has a single name-style field labeled "Name", "Full name", "Customer name", "Your name", or similar, map to "fullName" (the firstName + lastName composite) — do NOT use firstName alone.
+
 Rules:
 - "profileKey" MUST be one of the profile keys listed in the user prompt. Never invent profile keys for "fill".
 - Use the profile VALUES as semantic hints (e.g. an email-looking value matches an <input type="email">).
@@ -49,6 +51,15 @@ export function buildUserPrompt(
     const value = getProfileValue(profile, key);
     return `- ${key}: ${value ?? ""}`;
   });
+
+  const first = profile.firstName?.trim();
+  const last = profile.lastName?.trim();
+  if (first && last) {
+    profileLines.push(
+      `- fullName: ${first} ${last}    (computed; use for single name-style form fields)`
+    );
+  }
+
   const profileSection =
     keys.length > 0
       ? `Available profile keys (with values):\n${profileLines.join("\n")}`

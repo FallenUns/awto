@@ -176,3 +176,42 @@ describe("getOutputJsonSchema", () => {
     expect(schema.$ref).toBeUndefined();
   });
 });
+
+describe("buildUserPrompt fullName composite", () => {
+  it("injects a fullName composite when both names exist", () => {
+    const profile: Profile = {
+      firstName: "Patrick",
+      lastName: "Adrianus",
+      custom: {},
+    };
+    const prompt = buildUserPrompt(profile, []);
+    expect(prompt).toContain("fullName: Patrick Adrianus");
+  });
+
+  it("does NOT inject fullName when only firstName exists", () => {
+    const profile: Profile = {
+      firstName: "Patrick",
+      custom: {},
+    };
+    const prompt = buildUserPrompt(profile, []);
+    expect(prompt).not.toMatch(/^- fullName:/m);
+  });
+
+  it("does NOT inject fullName when only lastName exists", () => {
+    const profile: Profile = {
+      lastName: "Adrianus",
+      custom: {},
+    };
+    const prompt = buildUserPrompt(profile, []);
+    expect(prompt).not.toMatch(/^- fullName:/m);
+  });
+});
+
+describe("SYSTEM_PROMPT fullName rule", () => {
+  it("instructs to use fullName for single name-style fields", () => {
+    expect(SYSTEM_PROMPT.toLowerCase()).toMatch(
+      /customer name|full name|single name-style/
+    );
+    expect(SYSTEM_PROMPT).toContain("fullName");
+  });
+});
