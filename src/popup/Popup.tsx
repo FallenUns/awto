@@ -1,52 +1,49 @@
-import { useEffect, useState } from "react";
-import { Check, Loader2, AlertCircle, FileX2, Braces, List } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { Check, AlertCircle, FileX2, Sparkles, BookmarkPlus } from "lucide-react";
 import { StatusBar } from "./StatusBar";
-import { WillFillSection } from "./WillFillSection";
-import { NeedsInputSection } from "./NeedsInputSection";
-import { SkippedSection } from "./SkippedSection";
 import { Footer } from "./Footer";
 import { useAwtoFlow } from "./useAwtoFlow";
 
-const VIEW_STORAGE_KEY = "awto:popupView";
-type PopupView = "raw" | "friendly";
-
-function loadView(): PopupView {
-  try {
-    const stored = localStorage.getItem(VIEW_STORAGE_KEY);
-    return stored === "friendly" ? "friendly" : "raw";
-  } catch {
-    return "raw";
-  }
-}
-
 export function Popup() {
-  const { state, status, setOverrideValue, setMissingValue, fill, retry, cancel } =
-    useAwtoFlow();
-  const [view, setView] = useState<PopupView>(loadView);
+  const { state, status, setMissingValue, fill, retry, cancel } = useAwtoFlow();
+  const feedRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(VIEW_STORAGE_KEY, view);
-    } catch {
-      // ignore quota / disabled storage
+    if (feedRef.current) {
+      feedRef.current.scrollTop = feedRef.current.scrollHeight;
     }
-  }, [view]);
+  }, [state.missingRows, status]);
+
+  const fillCount = state.fillRows.length;
+  const missingCount = state.missingRows.length;
+  const skippedCount = state.skippedRows.length;
+  const answeredMissing = state.missingRows.filter(
+    (r) => r.userValue.trim() !== ""
+  ).length;
+
+  const fillDisabled =
+    fillCount === 0 && state.missingRows.every((r) => r.userValue.trim() === "");
+  const totalToFill = fillCount + answeredMissing;
 
   return (
     <div className="awto-popup">
       <StatusBar status={status} />
-      <main className="awto-main">
+
+      <main className="awto-main" ref={feedRef}>
         {(status === "scanning" || status === "mapping") && (
-          <div className="awto-center" role="status" aria-live="polite">
-            <Loader2
-              size={24}
-              className="awto-spin"
-              strokeWidth={1.5}
-              aria-hidden="true"
-            />
-            <p className="awto-center__text">
-              {status === "scanning" ? "Scanning form…" : "Mapping fields…"}
-            </p>
+          <div className="awto-chat" role="status" aria-live="polite">
+            <Bubble role="assistant">
+              <span className="awto-typing" aria-label="Awto is thinking">
+                <span className="awto-typing__dot" />
+                <span className="awto-typing__dot" />
+                <span className="awto-typing__dot" />
+              </span>
+              <span className="awto-bubble__text awto-muted">
+                {status === "scanning"
+                  ? "Reading the form…"
+                  : "Working out what to fill…"}
+              </span>
+            </Bubble>
           </div>
         )}
 
@@ -93,67 +90,149 @@ export function Popup() {
         )}
 
         {(status === "ready" || status === "filling") && (
-          <>
-            <div className="awto-view-toggle" role="group" aria-label="View mode">
-              <button
-                type="button"
-                className={`awto-view-toggle__btn ${view === "raw" ? "is-active" : ""}`}
-                onClick={() => setView("raw")}
-                aria-pressed={view === "raw"}
-              >
-                <Braces size={14} strokeWidth={1.5} aria-hidden="true" />
-                <span>Raw output</span>
-              </button>
-              <button
-                type="button"
-                className={`awto-view-toggle__btn ${view === "friendly" ? "is-active" : ""}`}
-                onClick={() => setView("friendly")}
-                aria-pressed={view === "friendly"}
-              >
-                <List size={14} strokeWidth={1.5} aria-hidden="true" />
-                <span>Friendly</span>
-              </button>
-            </div>
+          <div className="awto-chat" aria-live="polite">
+            <Bubble role="assistant">
+              <span className="awto-bubble__text">
+                <Sparkles size={14} strokeWidth={1.5} className="awto-bubble__icon" aria-hidden="true" />
+                Hi! I had a look at this form.
+              </span>
+            </Bubble>
 
-            {view === "raw" ? (
-              <pre className="awto-raw" aria-label="Raw LLM output">
-                {JSON.stringify(
-                  {
-                    fields: state.fields,
-                    mappings: state.mappings,
-                  },
-                  null,
-                  2
-                )}
-              </pre>
-            ) : (
+            {fillCount > 0 && (
+              <Bubble role="assistant">
+                <span className="awto-bubble__text">
+                  I can fill <strong>{fillCount}</strong> field{fillCount === 1 ? "" : "s"} from your profile:
+                </span>
+                <ul className="awto-fill-list">
+                  {state.fillRows.map((row) => (
+                    <li key={row.fieldId} className="awto-fill-list__item">
+                      <span className="awto-fill-list__label">{row.label}</span>
+                      <span className="awto-fill-list__value">
+                        {row.resolvedValue || <em className="awto-muted">empty</em>}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </Bubble>
+            )}
+
+            {fillCount === 0 && missingCount === 0 && (
+              <Bubble role="assistant">
+                <span className="awto-bubble__text">
+                  Nothing I can fill automatically here.
+                </span>
+              </Bubble>
+            )}
+
+            {missingCount > 0 && (
               <>
-                <WillFillSection
-                  rows={state.fillRows}
-                  onOverride={setOverrideValue}
-                />
-                <NeedsInputSection
-                  rows={state.missingRows}
-                  onChange={setMissingValue}
-                />
-                <SkippedSection rows={state.skippedRows} />
+                <Bubble role="assistant">
+                  <span className="awto-bubble__text">
+                    {fillCount > 0 ? "But I'm missing " : "I need "}
+                    <strong>{missingCount}</strong> thing{missingCount === 1 ? "" : "s"}.
+                    Want to fill them?
+                  </span>
+                  <span className="awto-bubble__hint">
+                    <BookmarkPlus size={12} strokeWidth={1.5} aria-hidden="true" />
+                    I'll save your answers to your profile for next time.
+                  </span>
+                </Bubble>
+
+                {state.missingRows.map((row) => {
+                  const inputId = `missing-${row.fieldId}`;
+                  const helperId = `missing-${row.fieldId}-helper`;
+                  const answered = row.userValue.trim() !== "";
+                  return (
+                    <div key={row.fieldId} className="awto-qa">
+                      <Bubble role="assistant" compact>
+                        <span className="awto-bubble__text awto-bubble__text--question">
+                          {row.promptText || `What's your ${row.label}?`}
+                        </span>
+                      </Bubble>
+                      <div className="awto-qa__input">
+                        <label htmlFor={inputId} className="awto-qa__label">
+                          {row.label}
+                        </label>
+                        <input
+                          id={inputId}
+                          type="text"
+                          className="awto-input"
+                          value={row.userValue}
+                          onChange={(e) =>
+                            setMissingValue(row.fieldId, e.target.value)
+                          }
+                          aria-describedby={helperId}
+                        />
+                        <p
+                          id={helperId}
+                          className={`awto-qa__helper ${answered ? "is-answered" : ""}`}
+                          aria-live="polite"
+                        >
+                          {answered ? (
+                            <>
+                              <Check size={12} strokeWidth={2} aria-hidden="true" />
+                              Saved to your profile as "{row.suggestedKey}"
+                            </>
+                          ) : (
+                            <span className="awto-muted">
+                              Will be saved as "{row.suggestedKey}"
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
               </>
             )}
-          </>
+
+            {skippedCount > 0 && (
+              <Bubble role="system">
+                <span className="awto-bubble__text awto-muted">
+                  Skipped {skippedCount} field{skippedCount === 1 ? "" : "s"} I couldn't map.
+                </span>
+              </Bubble>
+            )}
+
+            {(fillCount > 0 || missingCount > 0) && (
+              <Bubble role="assistant">
+                <span className="awto-bubble__text">
+                  {missingCount > 0 && answeredMissing < missingCount
+                    ? `Fill in the ${missingCount - answeredMissing} above, then tap Fill.`
+                    : `Ready when you are — tap Fill to drop ${totalToFill} value${totalToFill === 1 ? "" : "s"} into the form.`}
+                </span>
+              </Bubble>
+            )}
+          </div>
         )}
       </main>
+
       {(status === "ready" || status === "filling") && (
         <Footer
           filling={status === "filling"}
-          fillDisabled={state.fillRows.length === 0 && state.missingRows.every((r) => r.userValue.trim() === "")}
-          fillCount={
-            state.fillRows.filter((r) => r.resolvedValue !== "").length +
-            state.missingRows.filter((r) => r.userValue.trim() !== "").length
-          }
+          fillDisabled={fillDisabled}
+          fillCount={totalToFill}
           onCancel={cancel}
           onFill={() => void fill()}
         />
       )}
+    </div>
+  );
+}
+
+interface BubbleProps {
+  role: "assistant" | "user" | "system";
+  compact?: boolean;
+  children: React.ReactNode;
+}
+
+function Bubble({ role, compact, children }: BubbleProps) {
+  return (
+    <div className={`awto-bubble awto-bubble--${role} ${compact ? "is-compact" : ""}`}>
+      {role === "assistant" && (
+        <div className="awto-bubble__avatar" aria-hidden="true">A</div>
+      )}
+      <div className="awto-bubble__body">{children}</div>
     </div>
   );
 }
