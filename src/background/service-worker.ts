@@ -104,3 +104,9 @@ chrome.runtime.onMessage.addListener((message: AwtoMessage, _sender, sendRespons
     });
   return true;
 });
+
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason === "install") {
+    void chrome.runtime.openOptionsPage();
+  }
+});
