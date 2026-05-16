@@ -1,4 +1,5 @@
-import { Check, Loader2, AlertCircle, FileX2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Check, Loader2, AlertCircle, FileX2, Braces, List } from "lucide-react";
 import { StatusBar } from "./StatusBar";
 import { WillFillSection } from "./WillFillSection";
 import { NeedsInputSection } from "./NeedsInputSection";
@@ -6,9 +7,30 @@ import { SkippedSection } from "./SkippedSection";
 import { Footer } from "./Footer";
 import { useAwtoFlow } from "./useAwtoFlow";
 
+const VIEW_STORAGE_KEY = "awto:popupView";
+type PopupView = "raw" | "friendly";
+
+function loadView(): PopupView {
+  try {
+    const stored = localStorage.getItem(VIEW_STORAGE_KEY);
+    return stored === "friendly" ? "friendly" : "raw";
+  } catch {
+    return "raw";
+  }
+}
+
 export function Popup() {
   const { state, status, setOverrideValue, setMissingValue, fill, retry, cancel } =
     useAwtoFlow();
+  const [view, setView] = useState<PopupView>(loadView);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(VIEW_STORAGE_KEY, view);
+    } catch {
+      // ignore quota / disabled storage
+    }
+  }, [view]);
 
   return (
     <div className="awto-popup">
@@ -72,15 +94,51 @@ export function Popup() {
 
         {(status === "ready" || status === "filling") && (
           <>
-            <WillFillSection
-              rows={state.fillRows}
-              onOverride={setOverrideValue}
-            />
-            <NeedsInputSection
-              rows={state.missingRows}
-              onChange={setMissingValue}
-            />
-            <SkippedSection rows={state.skippedRows} />
+            <div className="awto-view-toggle" role="group" aria-label="View mode">
+              <button
+                type="button"
+                className={`awto-view-toggle__btn ${view === "raw" ? "is-active" : ""}`}
+                onClick={() => setView("raw")}
+                aria-pressed={view === "raw"}
+              >
+                <Braces size={14} strokeWidth={1.5} aria-hidden="true" />
+                <span>Raw output</span>
+              </button>
+              <button
+                type="button"
+                className={`awto-view-toggle__btn ${view === "friendly" ? "is-active" : ""}`}
+                onClick={() => setView("friendly")}
+                aria-pressed={view === "friendly"}
+              >
+                <List size={14} strokeWidth={1.5} aria-hidden="true" />
+                <span>Friendly</span>
+              </button>
+            </div>
+
+            {view === "raw" ? (
+              <pre className="awto-raw" aria-label="Raw LLM output">
+                {JSON.stringify(
+                  {
+                    fields: state.fields,
+                    mappings: state.mappings,
+                  },
+                  null,
+                  2
+                )}
+              </pre>
+            ) : (
+              <>
+                <WillFillSection
+                  rows={state.fillRows}
+                  onOverride={setOverrideValue}
+                />
+                <NeedsInputSection
+                  rows={state.missingRows}
+                  onChange={setMissingValue}
+                />
+                <SkippedSection rows={state.skippedRows} />
+              </>
+            )}
           </>
         )}
       </main>
