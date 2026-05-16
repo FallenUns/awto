@@ -5,7 +5,11 @@ import type { FieldMapping } from "@/shared/mapping";
 import type { Profile } from "@/shared/profile";
 
 (globalThis as unknown as { chrome: unknown }).chrome = {
-  runtime: { onMessage: { addListener: vi.fn() }, lastError: undefined },
+  runtime: {
+    onMessage: { addListener: vi.fn() },
+    lastError: undefined,
+    connect: vi.fn(),
+  },
   tabs: { query: vi.fn(), sendMessage: vi.fn() },
   storage: { local: { get: vi.fn(), set: vi.fn() } },
 };
@@ -71,18 +75,103 @@ const mappings: FieldMapping[] = [
 
 const baseProfile: Profile = { firstName: "Patrick", custom: {} };
 
+interface FakePort {
+  name: string;
+  onMessage: { addListener: (fn: (msg: AwtoMessage) => void) => void };
+  onDisconnect: { addListener: (fn: () => void) => void };
+  postMessage: (msg: AwtoMessage) => void;
+  disconnect: () => void;
+}
+
+interface PortHandle {
+  port: FakePort;
+  messageListeners: Array<(msg: AwtoMessage) => void>;
+  disconnectListeners: Array<() => void>;
+  posted: AwtoMessage[];
+  disconnected: { value: boolean };
+  /** Auto-reply to mapFields with a mapFieldsResult. */
+  autoReply: (reply: AwtoMessage) => void;
+}
+
+function makePort(): PortHandle {
+  const messageListeners: Array<(msg: AwtoMessage) => void> = [];
+  const disconnectListeners: Array<() => void> = [];
+  const posted: AwtoMessage[] = [];
+  const disconnected = { value: false };
+  const port: FakePort = {
+    name: "awto-chat",
+    onMessage: {
+      addListener: (fn) => {
+        messageListeners.push(fn);
+      },
+    },
+    onDisconnect: {
+      addListener: (fn) => {
+        disconnectListeners.push(fn);
+      },
+    },
+    postMessage: (msg) => {
+      posted.push(msg);
+    },
+    disconnect: () => {
+      disconnected.value = true;
+      for (const fn of disconnectListeners) fn();
+    },
+  };
+  return {
+    port,
+    messageListeners,
+    disconnectListeners,
+    posted,
+    disconnected,
+    autoReply: (reply) => {
+      for (const fn of messageListeners) fn(reply);
+    },
+  };
+}
+
 interface DepBag {
   queryActiveTab: ReturnType<typeof vi.fn>;
   sendToTab: ReturnType<typeof vi.fn>;
-  sendToRuntime: ReturnType<typeof vi.fn>;
+  connect: ReturnType<typeof vi.fn>;
   loadProfile: ReturnType<typeof vi.fn>;
   saveProfile: ReturnType<typeof vi.fn>;
   closePopup: ReturnType<typeof vi.fn>;
+  portHandle: PortHandle;
+  /** Reply that the port should send back on mapFields. */
+  mapReply: AwtoMessage;
 }
 
-function makeDeps(overrides: Partial<DepBag> = {}): DepBag {
+function makeDeps(
+  overrides: Partial<
+    Omit<DepBag, "connect" | "portHandle"> & {
+      portHandle?: PortHandle;
+      mapReply?: AwtoMessage;
+    }
+  > = {}
+): DepBag {
+  const portHandle = overrides.portHandle ?? makePort();
+  const mapReply: AwtoMessage =
+    overrides.mapReply ??
+    ({
+      type: "mapFieldsResult",
+      mappings,
+      source: "local",
+    } satisfies AwtoMessage);
+
+  // Auto-respond to any mapFields postMessage via the port's message listeners.
+  const originalPost = portHandle.port.postMessage;
+  portHandle.port.postMessage = (msg: AwtoMessage) => {
+    originalPost(msg);
+    if (msg.type === "mapFields") {
+      // Defer so the effect that registers the message listener has run.
+      queueMicrotask(() => portHandle.autoReply(mapReply));
+    }
+  };
+
   return {
-    queryActiveTab: overrides.queryActiveTab ?? vi.fn().mockResolvedValue({ id: 42 }),
+    queryActiveTab:
+      overrides.queryActiveTab ?? vi.fn().mockResolvedValue({ id: 42 }),
     sendToTab:
       overrides.sendToTab ??
       vi.fn().mockImplementation(async (_tabId: number, msg: AwtoMessage) => {
@@ -98,21 +187,12 @@ function makeDeps(overrides: Partial<DepBag> = {}): DepBag {
         }
         throw new Error(`unexpected tab message: ${msg.type}`);
       }),
-    sendToRuntime:
-      overrides.sendToRuntime ??
-      vi.fn().mockImplementation(async (msg: AwtoMessage) => {
-        if (msg.type === "mapFields") {
-          return {
-            type: "mapFieldsResult",
-            mappings,
-            source: "local",
-          } satisfies AwtoMessage;
-        }
-        throw new Error(`unexpected runtime message: ${msg.type}`);
-      }),
+    connect: vi.fn(() => portHandle.port),
     loadProfile: overrides.loadProfile ?? vi.fn().mockResolvedValue(baseProfile),
     saveProfile: overrides.saveProfile ?? vi.fn().mockResolvedValue(undefined),
     closePopup: overrides.closePopup ?? vi.fn(),
+    portHandle,
+    mapReply,
   };
 }
 
@@ -121,7 +201,7 @@ function renderFlow(deps: DepBag) {
     useAwtoFlow({
       _queryActiveTab: deps.queryActiveTab,
       _sendToTab: deps.sendToTab,
-      _sendToRuntime: deps.sendToRuntime,
+      _connect: deps.connect as unknown as typeof chrome.runtime.connect,
       _loadProfile: deps.loadProfile,
       _saveProfile: deps.saveProfile,
       _closePopup: deps.closePopup,
@@ -155,21 +235,26 @@ describe("useAwtoFlow", () => {
     await waitFor(() => {
       expect(result.current.status).toBe("no-form");
     });
-    expect(deps.sendToRuntime).not.toHaveBeenCalled();
+    expect(
+      deps.portHandle.posted.some((m) => m.type === "mapFields")
+    ).toBe(false);
   });
 
-  it("sends mapFields to background when scanForm returns fields", async () => {
+  it("connects to background via port and posts mapFields on scanForm result", async () => {
     const deps = makeDeps();
     renderFlow(deps);
 
     await waitFor(() => {
-      expect(deps.sendToRuntime).toHaveBeenCalledTimes(1);
+      expect(
+        deps.portHandle.posted.some((m) => m.type === "mapFields")
+      ).toBe(true);
     });
-    expect(deps.sendToRuntime).toHaveBeenCalledWith({
-      type: "mapFields",
-      fields,
-      profile: baseProfile,
-    });
+    expect(deps.connect).toHaveBeenCalledWith({ name: "awto-chat" });
+    const mapMsg = deps.portHandle.posted.find(
+      (m) => m.type === "mapFields"
+    ) as Extract<AwtoMessage, { type: "mapFields" }>;
+    expect(mapMsg.fields).toEqual(fields);
+    expect(mapMsg.profile).toEqual(baseProfile);
   });
 
   it("transitions to ready with categorised rows on mapFields success", async () => {
@@ -199,12 +284,12 @@ describe("useAwtoFlow", () => {
     });
   });
 
-  it("transitions to error with message when mapFields returns mapFieldsError", async () => {
+  it("transitions to error with message when port replies with mapFieldsError", async () => {
     const deps = makeDeps({
-      sendToRuntime: vi.fn().mockResolvedValue({
+      mapReply: {
         type: "mapFieldsError",
         error: "Local model offline",
-      } satisfies AwtoMessage),
+      } satisfies AwtoMessage,
     });
     const { result } = renderFlow(deps);
 
@@ -299,5 +384,47 @@ describe("useAwtoFlow", () => {
 
     expect(deps.saveProfile).not.toHaveBeenCalled();
     expect(result.current.status).toBe("done");
+  });
+
+  it("disconnects the port on unmount", async () => {
+    let disconnected = false;
+    const port = {
+      name: "awto-chat",
+      onMessage: { addListener: () => {} },
+      onDisconnect: { addListener: () => {} },
+      postMessage: () => {},
+      disconnect: () => {
+        disconnected = true;
+      },
+    };
+    const connect = (() => port) as unknown as typeof chrome.runtime.connect;
+    // Hoist deps out of the renderHook callback so their identities are
+    // stable across re-renders; otherwise the run-effect's dep list churns
+    // every render and triggers an infinite loop.
+    const sendToTab = vi
+      .fn()
+      .mockResolvedValue({ type: "scanFormResult", fields: [] });
+    const queryActiveTab = vi.fn().mockResolvedValue({ id: 1 });
+    const loadProfileMock = vi.fn().mockResolvedValue({ custom: {} });
+    const saveProfileMock = vi.fn().mockResolvedValue(undefined);
+    const closePopup = vi.fn();
+    const { result, unmount } = renderHook(() =>
+      useAwtoFlow({
+        _connect: connect,
+        _sendToTab: sendToTab,
+        _queryActiveTab: queryActiveTab,
+        _loadProfile: loadProfileMock,
+        _saveProfile: saveProfileMock,
+        _closePopup: closePopup,
+      })
+    );
+
+    // Let effects mount and the scan step settle before unmount.
+    await waitFor(() => {
+      expect(result.current.status).toBe("no-form");
+    });
+
+    unmount();
+    expect(disconnected).toBe(true);
   });
 });

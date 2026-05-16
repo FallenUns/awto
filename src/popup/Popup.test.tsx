@@ -3,7 +3,17 @@ import { render, screen, waitFor } from "@testing-library/react";
 import type { AwtoMessage } from "@/shared/messages";
 
 (globalThis as unknown as { chrome: unknown }).chrome = {
-  runtime: { onMessage: { addListener: vi.fn() }, lastError: undefined },
+  runtime: {
+    onMessage: { addListener: vi.fn() },
+    lastError: undefined,
+    connect: vi.fn(() => ({
+      name: "awto-chat",
+      onMessage: { addListener: vi.fn() },
+      onDisconnect: { addListener: vi.fn() },
+      postMessage: vi.fn(),
+      disconnect: vi.fn(),
+    })),
+  },
   tabs: {
     query: vi.fn((_q, cb: (tabs: chrome.tabs.Tab[]) => void) =>
       cb([{ id: 1 } as chrome.tabs.Tab])

@@ -24,7 +24,7 @@ import type {
 export interface UseAwtoFlowDeps {
   _queryActiveTab?: () => Promise<{ id?: number } | undefined>;
   _sendToTab?: (tabId: number, message: AwtoMessage) => Promise<AwtoMessage>;
-  _sendToRuntime?: (message: AwtoMessage) => Promise<AwtoMessage>;
+  _connect?: typeof chrome.runtime.connect;
   _loadProfile?: () => Promise<Profile>;
   _saveProfile?: (profile: Profile) => Promise<void>;
   _closePopup?: () => void;
@@ -58,19 +58,6 @@ function defaultSendToTab(
       const lastError = chrome.runtime.lastError;
       if (lastError) {
         reject(new Error(lastError.message ?? "Tab message failed"));
-        return;
-      }
-      resolve(response);
-    });
-  });
-}
-
-function defaultSendToRuntime(message: AwtoMessage): Promise<AwtoMessage> {
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage(message, (response: AwtoMessage) => {
-      const lastError = chrome.runtime.lastError;
-      if (lastError) {
-        reject(new Error(lastError.message ?? "Runtime message failed"));
         return;
       }
       resolve(response);
@@ -141,7 +128,8 @@ export interface UseAwtoFlowResult {
 export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
   const queryActiveTab = deps._queryActiveTab ?? defaultQueryActiveTab;
   const sendToTab = deps._sendToTab ?? defaultSendToTab;
-  const sendToRuntime = deps._sendToRuntime ?? defaultSendToRuntime;
+  const connectFn: typeof chrome.runtime.connect =
+    deps._connect ?? chrome.runtime.connect.bind(chrome.runtime);
   const loadProfileFn = deps._loadProfile ?? loadProfile;
   const saveProfileFn = deps._saveProfile ?? saveProfile;
   const closePopup = deps._closePopup ?? defaultClosePopup;
@@ -151,10 +139,66 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
   const profileRef = useRef<Profile>(EMPTY_PROFILE);
   const tabIdRef = useRef<number | null>(null);
   const stateRef = useRef<FlowState>(INITIAL_STATE);
+  const fieldsRef = useRef<ScannedField[]>([]);
+  const portRef = useRef<chrome.runtime.Port | null>(null);
 
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+
+  // Establish the background port once. Messages from the port drive the
+  // map step's state transitions (mapFieldsResult / mapFieldsError).
+  useEffect(() => {
+    const port = connectFn({ name: "awto-chat" });
+    portRef.current = port;
+
+    const onMessage = (msg: AwtoMessage) => {
+      if (msg.type === "mapFieldsResult") {
+        const profile = profileRef.current;
+        const fields = fieldsRef.current;
+        const { fillRows, missingRows, skippedRows } = buildRows(
+          fields,
+          msg.mappings,
+          profile
+        );
+        setState({
+          status: "ready",
+          error: null,
+          fields,
+          mappings: msg.mappings,
+          fillRows,
+          missingRows,
+          skippedRows,
+          filledCount: 0,
+        });
+      } else if (msg.type === "mapFieldsError") {
+        setState((s) => ({
+          ...s,
+          status: "error",
+          error: msg.error,
+        }));
+      }
+    };
+
+    const onDisconnect = () => {
+      portRef.current = null;
+    };
+
+    port.onMessage.addListener(onMessage);
+    port.onDisconnect.addListener(onDisconnect);
+
+    return () => {
+      try {
+        port.disconnect();
+      } catch {
+        // ignore
+      }
+      portRef.current = null;
+    };
+    // connectFn is stable for the lifetime of the hook (DI from deps); we
+    // intentionally only run this once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -192,50 +236,28 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
         }
 
         setState((s) => ({ ...s, status: "mapping", fields }));
+        fieldsRef.current = fields;
 
         const profile = await loadProfileFn();
         if (cancelled) return;
         profileRef.current = profile;
 
-        const mapReply = await sendToRuntime({
+        const port = portRef.current;
+        if (!port) {
+          setState((s) => ({
+            ...s,
+            status: "error",
+            error: "Background channel unavailable.",
+          }));
+          return;
+        }
+        port.postMessage({
           type: "mapFields",
           fields,
           profile,
         });
-        if (cancelled) return;
-        if (mapReply.type === "mapFieldsError") {
-          setState((s) => ({
-            ...s,
-            status: "error",
-            error: mapReply.error,
-          }));
-          return;
-        }
-        if (mapReply.type !== "mapFieldsResult") {
-          setState((s) => ({
-            ...s,
-            status: "error",
-            error: "Unexpected reply from background.",
-          }));
-          return;
-        }
-
-        const { fillRows, missingRows, skippedRows } = buildRows(
-          fields,
-          mapReply.mappings,
-          profile
-        );
-
-        setState({
-          status: "ready",
-          error: null,
-          fields,
-          mappings: mapReply.mappings,
-          fillRows,
-          missingRows,
-          skippedRows,
-          filledCount: 0,
-        });
+        // The reply arrives via the port.onMessage listener registered in
+        // the connect-effect above.
       } catch (err) {
         if (cancelled) return;
         setState((s) => ({
@@ -250,13 +272,7 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
     return () => {
       cancelled = true;
     };
-  }, [
-    runId,
-    queryActiveTab,
-    sendToTab,
-    sendToRuntime,
-    loadProfileFn,
-  ]);
+  }, [runId, queryActiveTab, sendToTab, loadProfileFn]);
 
   const setOverrideValue = useCallback((fieldId: number, value: string) => {
     setState((s) => ({
