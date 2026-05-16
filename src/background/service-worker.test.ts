@@ -1,8 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Profile } from "@/shared/profile";
 import type { ScannedField, AwtoMessage } from "@/shared/messages";
 import type { LLMSettings } from "@/shared/storage";
 import type { HybridResult } from "./llm/hybrid";
+import { _clearCache, setCached, cacheKey, getCached } from "./result-cache";
 
 (globalThis as unknown as { chrome: unknown }).chrome = {
   runtime: {
@@ -299,6 +300,102 @@ describe("handleMessage", () => {
   });
 });
 
+describe("handleMessage with result cache", () => {
+  beforeEach(() => {
+    _clearCache();
+  });
+
+  it("returns cached result and skips hybrid on cache hit", async () => {
+    const loadLLMSettings = vi.fn().mockResolvedValue(defaultSettings);
+    const callHybrid = vi.fn();
+    const key = cacheKey(42, fields);
+    setCached(key, {
+      mappings: [
+        {
+          fieldId: 0,
+          actionType: "fill",
+          profileKey: "firstName",
+          suggestedKey: null,
+          promptText: null,
+          reason: null,
+          confidence: 0.95,
+        },
+      ],
+      source: "cloud",
+    });
+
+    const response = await handleMessage(
+      { type: "mapFields", fields, profile },
+      { _loadLLMSettings: loadLLMSettings, _callHybrid: callHybrid, tabId: 42 }
+    );
+
+    expect(response).toEqual({
+      type: "mapFieldsResult",
+      mappings: expect.any(Array),
+      source: "cloud",
+    });
+    expect(callHybrid).not.toHaveBeenCalled();
+    expect(loadLLMSettings).not.toHaveBeenCalled();
+  });
+
+  it("caches successful result for future hits", async () => {
+    const hybridResult = makeHybridResult();
+    const loadLLMSettings = vi.fn().mockResolvedValue(defaultSettings);
+    const callHybrid = vi.fn().mockResolvedValue(hybridResult);
+
+    await handleMessage(
+      { type: "mapFields", fields, profile },
+      { _loadLLMSettings: loadLLMSettings, _callHybrid: callHybrid, tabId: 7 }
+    );
+
+    const stored = getCached(cacheKey(7, fields));
+    expect(stored).not.toBeNull();
+    expect(stored?.mappings).toEqual(hybridResult.response.mappings);
+    expect(stored?.source).toBe("local");
+  });
+
+  it("does not cache when callHybrid throws", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const loadLLMSettings = vi.fn().mockResolvedValue(defaultSettings);
+    const callHybrid = vi.fn().mockRejectedValue(new Error("boom"));
+
+    await handleMessage(
+      { type: "mapFields", fields, profile },
+      { _loadLLMSettings: loadLLMSettings, _callHybrid: callHybrid, tabId: 8 }
+    );
+
+    expect(getCached(cacheKey(8, fields))).toBeNull();
+    consoleError.mockRestore();
+  });
+
+  it("does not cache when call is aborted", async () => {
+    const loadLLMSettings = vi.fn().mockResolvedValue(defaultSettings);
+    const callHybrid = vi.fn().mockRejectedValue(
+      Object.assign(new Error("aborted"), { name: "AbortError" })
+    );
+
+    await handleMessage(
+      { type: "mapFields", fields, profile },
+      { _loadLLMSettings: loadLLMSettings, _callHybrid: callHybrid, tabId: 9 }
+    );
+
+    expect(getCached(cacheKey(9, fields))).toBeNull();
+  });
+
+  it("falls through to hybrid when no tabId is provided", async () => {
+    const hybridResult = makeHybridResult();
+    const loadLLMSettings = vi.fn().mockResolvedValue(defaultSettings);
+    const callHybrid = vi.fn().mockResolvedValue(hybridResult);
+
+    await handleMessage(
+      { type: "mapFields", fields, profile },
+      { _loadLLMSettings: loadLLMSettings, _callHybrid: callHybrid }
+    );
+
+    expect(callHybrid).toHaveBeenCalledTimes(1);
+  });
+});
+
 function makeMockPort(name = "awto-chat"): {
   port: chrome.runtime.Port;
   fireMessage: (msg: AwtoMessage) => void;
@@ -336,7 +433,7 @@ it("supersedes the previous request when a new message arrives on the same port"
     );
   const { port, fireMessage, posted } = makeMockPort();
 
-  registerPortHandler(port, {
+  registerPortHandler(port, undefined, {
     _loadLLMSettings: vi.fn().mockResolvedValue(defaultSettings),
     _callHybrid: callHybrid,
   });
@@ -364,7 +461,7 @@ it("aborts the in-flight controller on port disconnect", async () => {
     );
   const { port, fireMessage, fireDisconnect } = makeMockPort();
 
-  registerPortHandler(port, {
+  registerPortHandler(port, undefined, {
     _loadLLMSettings: vi.fn().mockResolvedValue(defaultSettings),
     _callHybrid: callHybrid,
   });

@@ -2,6 +2,7 @@ import type { AwtoMessage } from "@/shared/messages";
 import { loadLLMSettings, type LLMSettings } from "@/shared/storage";
 import { callHybrid, type HybridResult } from "./llm/hybrid";
 import { pingOllama, listOllamaModels } from "./llm/local";
+import { cacheKey, getCached, setCached, invalidateTab } from "./result-cache";
 
 export type LoadLLMSettingsFn = () => Promise<LLMSettings>;
 export type CallHybridFn = typeof callHybrid;
@@ -14,6 +15,7 @@ export interface HandleMessageDeps {
   _pingOllama?: PingOllamaFn;
   _listOllamaModels?: ListOllamaModelsFn;
   signal?: AbortSignal;
+  tabId?: number;
 }
 
 function errorToMessage(err: unknown): string {
@@ -31,6 +33,19 @@ export async function handleMessage(
 
   switch (message.type) {
     case "mapFields": {
+      const tabId = deps.tabId;
+      if (tabId !== undefined) {
+        const key = cacheKey(tabId, message.fields);
+        const cached = getCached(key);
+        if (cached) {
+          return {
+            type: "mapFieldsResult",
+            mappings: cached.mappings,
+            source: cached.source,
+          };
+        }
+      }
+
       try {
         const settings = await loadSettings();
         const result: HybridResult = await hybrid(
@@ -38,6 +53,12 @@ export async function handleMessage(
           message.fields,
           { ...settings, signal: deps.signal }
         );
+        if (tabId !== undefined) {
+          setCached(cacheKey(tabId, message.fields), {
+            mappings: result.response.mappings,
+            source: result.source,
+          });
+        }
         return {
           type: "mapFieldsResult",
           mappings: result.response.mappings,
@@ -120,6 +141,7 @@ chrome.runtime.onMessage.addListener((message: AwtoMessage, _sender, sendRespons
 
 export function registerPortHandler(
   port: chrome.runtime.Port,
+  tabId: number | undefined,
   baseDeps: HandleMessageDeps = {}
 ) {
   let controller: AbortController | null = null;
@@ -130,7 +152,7 @@ export function registerPortHandler(
     controller = next;
 
     try {
-      const reply = await handleMessage(message, { ...baseDeps, signal: next.signal });
+      const reply = await handleMessage(message, { ...baseDeps, tabId, signal: next.signal });
       if (!next.signal.aborted) port.postMessage(reply);
     } catch (err) {
       if (next.signal.aborted) return;
@@ -151,11 +173,16 @@ export function registerPortHandler(
 
 chrome.runtime.onConnect?.addListener((port) => {
   if (port.name !== "awto-chat") return;
-  registerPortHandler(port);
+  const tabId = port.sender?.tab?.id;
+  registerPortHandler(port, tabId);
 });
 
 chrome.runtime.onInstalled?.addListener((details) => {
   if (details.reason === "install") {
     void chrome.runtime.openOptionsPage();
   }
+});
+
+chrome.tabs?.onRemoved?.addListener((tabId) => {
+  invalidateTab(tabId);
 });
