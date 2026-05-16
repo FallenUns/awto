@@ -13,6 +13,7 @@ export interface HandleMessageDeps {
   _callHybrid?: CallHybridFn;
   _pingOllama?: PingOllamaFn;
   _listOllamaModels?: ListOllamaModelsFn;
+  signal?: AbortSignal;
 }
 
 function errorToMessage(err: unknown): string {
@@ -35,7 +36,7 @@ export async function handleMessage(
         const result: HybridResult = await hybrid(
           message.profile,
           message.fields,
-          settings
+          { ...settings, signal: deps.signal }
         );
         return {
           type: "mapFieldsResult",

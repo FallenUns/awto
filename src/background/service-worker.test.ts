@@ -260,4 +260,24 @@ describe("handleMessage", () => {
 
     expect(loadLLMSettings).toHaveBeenCalledTimes(2);
   });
+
+  it("passes signal through to callHybrid on mapFields", async () => {
+    const loadLLMSettings = vi.fn().mockResolvedValue(defaultSettings);
+    const callHybrid = vi.fn().mockResolvedValue({
+      response: { mappings: [] },
+      source: "local",
+    });
+    const external = new AbortController();
+
+    await handleMessage(
+      { type: "mapFields", fields: [], profile: { custom: {} } },
+      { _loadLLMSettings: loadLLMSettings, _callHybrid: callHybrid, signal: external.signal }
+    );
+
+    expect(callHybrid).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ signal: external.signal })
+    );
+  });
 });
