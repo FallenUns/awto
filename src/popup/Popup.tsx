@@ -113,7 +113,16 @@ export function Popup() {
                 <ul className="awto-fill-list">
                   {state.fillRows.map((row) => (
                     <li key={row.fieldId} className="awto-fill-list__item">
-                      <span className="awto-fill-list__label">{row.label}</span>
+                      <span className="awto-fill-list__label">
+                        {row.confidence < 0.85 && (
+                          <span
+                            className="awto-confidence-dot"
+                            title="Low confidence — verify this value"
+                            aria-label="Low confidence"
+                          />
+                        )}
+                        {row.label}
+                      </span>
                       <span className="awto-fill-list__value">
                         {row.resolvedValue || <em className="awto-muted">empty</em>}
                       </span>

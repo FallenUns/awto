@@ -47,3 +47,34 @@ describe("Popup smoke", () => {
     });
   });
 });
+
+describe("Popup confidence dot", () => {
+  it("renders an amber confidence dot for rows with confidence < 0.85", async () => {
+    const { container } = render(
+      <div className="awto-fill-list">
+        <li className="awto-fill-list__item">
+          <span className="awto-fill-list__label">
+            <span
+              className="awto-confidence-dot"
+              title="Low confidence — verify this value"
+              aria-label="Low confidence"
+            />
+            Title
+          </span>
+          <span className="awto-fill-list__value">Mister</span>
+        </li>
+        <li className="awto-fill-list__item">
+          <span className="awto-fill-list__label">First Name</span>
+          <span className="awto-fill-list__value">Pat</span>
+        </li>
+      </div>
+    );
+
+    const dots = container.querySelectorAll(".awto-confidence-dot");
+    expect(dots).toHaveLength(1);
+
+    const dotElement = dots[0] as HTMLElement;
+    expect(dotElement.title).toBe("Low confidence — verify this value");
+    expect(dotElement.getAttribute("aria-label")).toBe("Low confidence");
+  });
+});

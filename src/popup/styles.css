@@ -610,6 +610,16 @@ input {
   30% { opacity: 1; transform: scale(1.3); }
 }
 
+.awto-confidence-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #F59E0B;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .awto-spin,
   .awto-typing__dot,
