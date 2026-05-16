@@ -50,4 +50,5 @@ export interface FlowState {
   skippedRows: SkippedRow[];
   filledCount: number;
   failedFills: FailedFill[];
+  chunksCompleted: number;
 }

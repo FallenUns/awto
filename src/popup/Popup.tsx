@@ -5,7 +5,8 @@ import { Footer } from "./Footer";
 import { useAwtoFlow } from "./useAwtoFlow";
 
 export function Popup() {
-  const { state, status, setMissingValue, fill, retry, cancel } = useAwtoFlow();
+  const { state, status, setMissingValue, fill, retry, cancel, rescan } =
+    useAwtoFlow();
   const feedRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -27,7 +28,7 @@ export function Popup() {
 
   return (
     <div className="awto-popup">
-      <StatusBar status={status} />
+      <StatusBar status={status} onRescan={rescan} />
 
       <main className="awto-main" ref={feedRef}>
         {(status === "scanning" || status === "mapping") && (
@@ -41,7 +42,7 @@ export function Popup() {
               <span className="awto-bubble__text awto-muted">
                 {status === "scanning"
                   ? "Reading the form…"
-                  : "Working out what to fill…"}
+                  : `Working out what to fill…${state.chunksCompleted > 0 ? ` (${state.chunksCompleted} done)` : ""}`}
               </span>
             </Bubble>
           </div>

@@ -1,8 +1,9 @@
-import { Check, Loader2, AlertCircle } from "lucide-react";
+import { Check, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import type { FlowStatus } from "./types";
 
 interface StatusBarProps {
   status: FlowStatus;
+  onRescan?: () => void;
 }
 
 function statusLabel(status: FlowStatus): string {
@@ -30,35 +31,51 @@ function statusDotColor(status: FlowStatus): string {
   return "var(--color-border)";
 }
 
-export function StatusBar({ status }: StatusBarProps) {
+export function StatusBar({ status, onRescan }: StatusBarProps) {
   const showSpinner = status === "scanning" || status === "mapping" || status === "filling";
   const showCheck = status === "ready" || status === "done";
   const showError = status === "error";
+  const showRescan =
+    onRescan !== undefined &&
+    (status === "ready" || status === "error" || status === "done");
 
   return (
     <header className="awto-statusbar" role="banner">
       <span className="awto-statusbar__brand">Awto</span>
-      <span className="awto-statusbar__status" aria-live="polite">
-        <span
-          className="awto-statusbar__dot"
-          style={{ background: statusDotColor(status) }}
-          aria-hidden="true"
-        />
-        {showSpinner && (
-          <Loader2
-            size={12}
-            className="awto-spin"
+      <span className="awto-statusbar__right">
+        <span className="awto-statusbar__status" aria-live="polite">
+          <span
+            className="awto-statusbar__dot"
+            style={{ background: statusDotColor(status) }}
             aria-hidden="true"
-            strokeWidth={1.5}
           />
+          {showSpinner && (
+            <Loader2
+              size={12}
+              className="awto-spin"
+              aria-hidden="true"
+              strokeWidth={1.5}
+            />
+          )}
+          {showCheck && (
+            <Check size={12} aria-hidden="true" strokeWidth={1.5} />
+          )}
+          {showError && (
+            <AlertCircle size={12} aria-hidden="true" strokeWidth={1.5} />
+          )}
+          <span className="awto-statusbar__label">{statusLabel(status)}</span>
+        </span>
+        {showRescan && (
+          <button
+            type="button"
+            className="awto-rescan-btn"
+            onClick={onRescan}
+            aria-label="Rescan this form"
+            title="Rescan this form"
+          >
+            <RefreshCw size={14} strokeWidth={1.5} aria-hidden="true" />
+          </button>
         )}
-        {showCheck && (
-          <Check size={12} aria-hidden="true" strokeWidth={1.5} />
-        )}
-        {showError && (
-          <AlertCircle size={12} aria-hidden="true" strokeWidth={1.5} />
-        )}
-        <span className="awto-statusbar__label">{statusLabel(status)}</span>
       </span>
     </header>
   );

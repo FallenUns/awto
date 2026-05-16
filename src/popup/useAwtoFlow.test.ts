@@ -426,6 +426,117 @@ describe("useAwtoFlow", () => {
     ]);
   });
 
+  it("appends rows as mapFieldsProgress chunks arrive and finalizes on complete", async () => {
+    const portHandle = makePort();
+    // Suppress the auto-reply: pass an explicit reply that we'll override below.
+    // We want to drive the port manually.
+    const queryActiveTab = vi.fn().mockResolvedValue({ id: 42 });
+    const sendToTab = vi
+      .fn()
+      .mockImplementation(async (_tabId: number, msg: AwtoMessage) => {
+        if (msg.type === "scanForm") {
+          return { type: "scanFormResult", fields } satisfies AwtoMessage;
+        }
+        throw new Error(`unexpected tab message: ${msg.type}`);
+      });
+    const loadProfileMock = vi.fn().mockResolvedValue(baseProfile);
+    const saveProfileMock = vi.fn().mockResolvedValue(undefined);
+    const closePopup = vi.fn();
+
+    const { result } = renderHook(() =>
+      useAwtoFlow({
+        _connect: (() => portHandle.port) as unknown as typeof chrome.runtime.connect,
+        _sendToTab: sendToTab,
+        _queryActiveTab: queryActiveTab,
+        _loadProfile: loadProfileMock,
+        _saveProfile: saveProfileMock,
+        _closePopup: closePopup,
+      })
+    );
+
+    // Wait until the hook has posted mapFields.
+    await waitFor(() => {
+      expect(
+        portHandle.posted.some((m) => m.type === "mapFields")
+      ).toBe(true);
+    });
+
+    // Status should still be "mapping" since we haven't replied yet.
+    expect(result.current.status).toBe("mapping");
+
+    // Fire first progress chunk: fill row only.
+    await act(async () => {
+      portHandle.autoReply({
+        type: "mapFieldsProgress",
+        mappings: [mappings[0]!],
+      });
+    });
+
+    expect(result.current.status).toBe("mapping");
+    expect(result.current.state.fillRows).toHaveLength(1);
+    expect(result.current.state.chunksCompleted).toBe(1);
+
+    // Fire second progress chunk: missing row.
+    await act(async () => {
+      portHandle.autoReply({
+        type: "mapFieldsProgress",
+        mappings: [mappings[1]!],
+      });
+    });
+
+    expect(result.current.status).toBe("mapping");
+    expect(result.current.state.fillRows).toHaveLength(1);
+    expect(result.current.state.missingRows).toHaveLength(1);
+    expect(result.current.state.chunksCompleted).toBe(2);
+
+    // Fire complete with final aggregated set.
+    await act(async () => {
+      portHandle.autoReply({
+        type: "mapFieldsComplete",
+        mappings,
+        source: "local",
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.status).toBe("ready");
+    });
+    expect(result.current.state.fillRows).toHaveLength(1);
+    expect(result.current.state.missingRows).toHaveLength(1);
+    expect(result.current.state.skippedRows).toHaveLength(1);
+  });
+
+  it("rescan() posts mapFields with bypassCache: true", async () => {
+    const deps = makeDeps();
+    const { result } = renderFlow(deps);
+
+    await waitFor(() => {
+      expect(result.current.status).toBe("ready");
+    });
+
+    // Sanity: first mapFields call has no bypassCache.
+    const firstMap = deps.portHandle.posted.find(
+      (m) => m.type === "mapFields"
+    ) as Extract<AwtoMessage, { type: "mapFields" }>;
+    expect(firstMap.bypassCache).toBeUndefined();
+
+    await act(async () => {
+      result.current.rescan();
+      // Flush the auto-reply microtask queued by the test harness on
+      // post so that the resulting state updates land inside act().
+      await Promise.resolve();
+    });
+
+    // The rescan call should post a second mapFields with bypassCache.
+    const mapCalls = deps.portHandle.posted.filter(
+      (m) => m.type === "mapFields"
+    ) as Array<Extract<AwtoMessage, { type: "mapFields" }>>;
+    expect(mapCalls).toHaveLength(2);
+    expect(mapCalls[1]?.bypassCache).toBe(true);
+    expect(mapCalls[1]?.tabId).toBe(42);
+    expect(mapCalls[1]?.fields).toEqual(fields);
+  });
+
   it("disconnects the port on unmount", async () => {
     let disconnected = false;
     const port = {

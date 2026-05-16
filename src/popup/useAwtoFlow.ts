@@ -41,6 +41,7 @@ const INITIAL_STATE: FlowState = {
   skippedRows: [],
   filledCount: 0,
   failedFills: [],
+  chunksCompleted: 0,
 };
 
 function defaultQueryActiveTab(): Promise<{ id?: number } | undefined> {
@@ -125,6 +126,7 @@ export interface UseAwtoFlowResult {
   fill: () => Promise<void>;
   retry: () => void;
   cancel: () => void;
+  rescan: () => void;
 }
 
 export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
@@ -173,7 +175,45 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
           skippedRows,
           filledCount: 0,
           failedFills: [],
+          chunksCompleted: 0,
         });
+      } else if (msg.type === "mapFieldsProgress") {
+        const profile = profileRef.current;
+        const fields = fieldsRef.current;
+        const { fillRows, missingRows, skippedRows } = buildRows(
+          fields,
+          msg.mappings,
+          profile
+        );
+        setState((s) => ({
+          ...s,
+          status: "mapping",
+          fillRows: [...s.fillRows, ...fillRows],
+          missingRows: [...s.missingRows, ...missingRows],
+          skippedRows: [...s.skippedRows, ...skippedRows],
+          mappings: [...s.mappings, ...msg.mappings],
+          chunksCompleted: s.chunksCompleted + 1,
+        }));
+      } else if (msg.type === "mapFieldsComplete") {
+        const profile = profileRef.current;
+        const fields = fieldsRef.current;
+        const { fillRows, missingRows, skippedRows } = buildRows(
+          fields,
+          msg.mappings,
+          profile
+        );
+        setState((s) => ({
+          ...s,
+          status: "ready",
+          error: null,
+          fields,
+          mappings: msg.mappings,
+          fillRows,
+          missingRows,
+          skippedRows,
+          filledCount: 0,
+          failedFills: [],
+        }));
       } else if (msg.type === "mapFieldsError") {
         setState((s) => ({
           ...s,
@@ -377,6 +417,32 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
     closePopup();
   }, [closePopup]);
 
+  const rescan = useCallback(() => {
+    const port = portRef.current;
+    const tabId = tabIdRef.current;
+    const fields = fieldsRef.current;
+    const profile = profileRef.current;
+    if (!port || tabId === null || fields.length === 0) return;
+    setState((s) => ({
+      ...s,
+      status: "mapping",
+      fillRows: [],
+      missingRows: [],
+      skippedRows: [],
+      mappings: [],
+      failedFills: [],
+      chunksCompleted: 0,
+      error: null,
+    }));
+    port.postMessage({
+      type: "mapFields",
+      fields,
+      profile,
+      tabId,
+      bypassCache: true,
+    });
+  }, []);
+
   return {
     state,
     status: state.status,
@@ -385,5 +451,6 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
     fill,
     retry,
     cancel,
+    rescan,
   };
 }
