@@ -4,6 +4,12 @@ import { ProfileSchema, EMPTY_PROFILE, type Profile } from "./profile";
 export const LLMSettingsSchema = z.object({
   ollamaUrl: z.string().url().default("http://localhost:11434"),
   ollamaModel: z.string().default("llama3.2"),
+  ollamaTimeoutMs: z
+    .number()
+    .int()
+    .min(5000)
+    .max(600000)
+    .default(90000),
   anthropicApiKey: z.string().default(""),
   anthropicModel: z.string().default("claude-opus-4-7"),
   cloudFallbackEnabled: z.boolean().default(true),

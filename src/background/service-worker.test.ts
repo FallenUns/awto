@@ -27,6 +27,7 @@ const fields: ScannedField[] = [
 const defaultSettings: LLMSettings = {
   ollamaUrl: "http://localhost:11434",
   ollamaModel: "llama3.2",
+  ollamaTimeoutMs: 90000,
   anthropicApiKey: "",
   anthropicModel: "claude-opus-4-7",
   cloudFallbackEnabled: true,

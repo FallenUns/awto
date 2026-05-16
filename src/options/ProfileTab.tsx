@@ -28,13 +28,26 @@ const SECTIONS: SectionDef[] = [
     id: "identity",
     title: "Identity",
     fields: [
+      {
+        key: "title",
+        label: "Title",
+        autocomplete: "honorific-prefix",
+        placeholder: "Mr / Ms / Mx / Dr",
+      },
       { key: "firstName", label: "First name", autocomplete: "given-name" },
+      {
+        key: "middleName",
+        label: "Middle name",
+        autocomplete: "additional-name",
+      },
       { key: "lastName", label: "Last name", autocomplete: "family-name" },
       {
         key: "preferredName",
         label: "Preferred name",
         autocomplete: "nickname",
       },
+      { key: "pronouns", label: "Pronouns", placeholder: "they/them" },
+      { key: "gender", label: "Gender" },
       {
         key: "dateOfBirth",
         label: "Date of birth",
@@ -42,7 +55,6 @@ const SECTIONS: SectionDef[] = [
         autocomplete: "bday",
         helper: "YYYY-MM-DD",
       },
-      { key: "nationality", label: "Nationality" },
     ],
   },
   {
@@ -50,7 +62,19 @@ const SECTIONS: SectionDef[] = [
     title: "Contact",
     fields: [
       { key: "email", label: "Email", type: "email", autocomplete: "email" },
+      {
+        key: "secondaryEmail",
+        label: "Secondary email",
+        type: "email",
+        autocomplete: "email",
+      },
       { key: "phone", label: "Phone", type: "tel", autocomplete: "tel" },
+      {
+        key: "mobilePhone",
+        label: "Mobile",
+        type: "tel",
+        autocomplete: "tel",
+      },
     ],
   },
   {
@@ -67,7 +91,8 @@ const SECTIONS: SectionDef[] = [
         label: "Address line 2",
         autocomplete: "address-line2",
       },
-      { key: "suburb", label: "Suburb / City", autocomplete: "address-level2" },
+      { key: "suburb", label: "Suburb", autocomplete: "address-level2" },
+      { key: "city", label: "City", autocomplete: "address-level2" },
       { key: "state", label: "State", autocomplete: "address-level1" },
       { key: "postcode", label: "Postcode", autocomplete: "postal-code" },
       { key: "country", label: "Country", autocomplete: "country-name" },
@@ -76,7 +101,63 @@ const SECTIONS: SectionDef[] = [
   {
     id: "work",
     title: "Work",
-    fields: [{ key: "workRights", label: "Work rights" }],
+    fields: [
+      {
+        key: "currentEmployer",
+        label: "Current employer",
+        autocomplete: "organization",
+      },
+      {
+        key: "jobTitle",
+        label: "Job title",
+        autocomplete: "organization-title",
+      },
+      { key: "linkedIn", label: "LinkedIn URL", type: "url" },
+      { key: "website", label: "Personal website", type: "url" },
+      { key: "github", label: "GitHub URL", type: "url" },
+    ],
+  },
+  {
+    id: "education",
+    title: "Education",
+    fields: [
+      {
+        key: "highestQualification",
+        label: "Highest qualification",
+        placeholder: "e.g. Bachelor of Science",
+      },
+      { key: "university", label: "University / Institution" },
+      {
+        key: "graduationYear",
+        label: "Graduation year",
+        placeholder: "2024",
+      },
+    ],
+  },
+  {
+    id: "identification",
+    title: "Identification",
+    fields: [
+      {
+        key: "taxFileNumber",
+        label: "Tax File Number (TFN)",
+        helper: "Australian TFN. Kept locally only.",
+      },
+      { key: "medicareNumber", label: "Medicare number" },
+      { key: "driverLicense", label: "Driver licence" },
+    ],
+  },
+  {
+    id: "status",
+    title: "Status",
+    fields: [
+      { key: "nationality", label: "Nationality" },
+      {
+        key: "workRights",
+        label: "Work rights",
+        placeholder: "e.g. Australian citizen",
+      },
+    ],
   },
 ];
 

@@ -183,6 +183,31 @@ export function LLMTab({
           </p>
         </div>
 
+        <div className="awto-field">
+          <label htmlFor="ollama-timeout" className="awto-label">
+            Request timeout (seconds)
+          </label>
+          <input
+            id="ollama-timeout"
+            className="awto-input"
+            type="number"
+            min={5}
+            max={600}
+            step={5}
+            value={Math.round(settings.ollamaTimeoutMs / 1000)}
+            onChange={(e) => {
+              const sec = Number.parseInt(e.target.value, 10);
+              if (Number.isFinite(sec)) {
+                onUpdate({ ollamaTimeoutMs: Math.max(5, Math.min(600, sec)) * 1000 });
+              }
+            }}
+          />
+          <p className="awto-helper--inline">
+            First call on a fresh model loads weights into VRAM and can take
+            30–90s. Raise this if you see timeout errors on a new model.
+          </p>
+        </div>
+
         <div
           style={{
             display: "flex",

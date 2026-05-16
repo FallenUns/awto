@@ -33,7 +33,7 @@ describe("buildUserPrompt", () => {
     lastName: "Adrianus",
     email: "patrick@example.com",
     phone: "+61400000000",
-    custom: { linkedIn: "https://linkedin.com/in/patrick" },
+    custom: { favouriteColour: "https://red" },
   };
 
   const fields: ScannedField[] = [
@@ -61,7 +61,7 @@ describe("buildUserPrompt", () => {
     expect(prompt).toContain("lastName");
     expect(prompt).toContain("email");
     expect(prompt).toContain("phone");
-    expect(prompt).toContain("linkedIn");
+    expect(prompt).toContain("favouriteColour");
   });
 
   it("includes every profile value", () => {
@@ -70,7 +70,7 @@ describe("buildUserPrompt", () => {
     expect(prompt).toContain("Adrianus");
     expect(prompt).toContain("patrick@example.com");
     expect(prompt).toContain("+61400000000");
-    expect(prompt).toContain("https://linkedin.com/in/patrick");
+    expect(prompt).toContain("https://red");
   });
 
   it("includes every field's label, placeholder, and type", () => {

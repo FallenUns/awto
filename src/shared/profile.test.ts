@@ -42,9 +42,9 @@ describe("ProfileSchema", () => {
 
   it("preserves the custom map when provided", () => {
     const profile = ProfileSchema.parse({
-      custom: { linkedIn: "https://linkedin.com/in/patrick" },
+      custom: { favouriteColour: "https://red" },
     });
-    expect(profile.custom.linkedIn).toBe("https://linkedin.com/in/patrick");
+    expect(profile.custom.favouriteColour).toBe("https://red");
   });
 });
 
@@ -61,12 +61,12 @@ describe("profileKeys", () => {
     const profile: Profile = ProfileSchema.parse({
       firstName: "Patrick",
       email: "patrick@example.com",
-      custom: { linkedIn: "https://linkedin.com/in/patrick" },
+      custom: { favouriteColour: "https://red" },
     });
     const keys = profileKeys(profile);
     expect(keys).toContain("firstName");
     expect(keys).toContain("email");
-    expect(keys).toContain("linkedIn");
+    expect(keys).toContain("favouriteColour");
     expect(keys).not.toContain("lastName");
   });
 
@@ -82,7 +82,7 @@ describe("getProfileValue", () => {
   const profile: Profile = ProfileSchema.parse({
     firstName: "Patrick",
     email: "patrick@example.com",
-    custom: { linkedIn: "https://linkedin.com/in/patrick" },
+    custom: { favouriteColour: "https://red" },
   });
 
   it("returns a built-in field value", () => {
@@ -91,8 +91,8 @@ describe("getProfileValue", () => {
   });
 
   it("returns a custom field value", () => {
-    expect(getProfileValue(profile, "linkedIn")).toBe(
-      "https://linkedin.com/in/patrick"
+    expect(getProfileValue(profile, "favouriteColour")).toBe(
+      "https://red"
     );
   });
 
@@ -109,9 +109,9 @@ describe("setProfileValue", () => {
   });
 
   it("writes an unknown key to the custom map", () => {
-    const next = setProfileValue(EMPTY_PROFILE, "linkedIn", "https://x");
-    expect(next.custom.linkedIn).toBe("https://x");
-    expect((next as Record<string, unknown>).linkedIn).toBeUndefined();
+    const next = setProfileValue(EMPTY_PROFILE, "favouriteColour", "red");
+    expect(next.custom.favouriteColour).toBe("red");
+    expect((next as Record<string, unknown>).favouriteColour).toBeUndefined();
   });
 
   it("does not mutate the input profile", () => {

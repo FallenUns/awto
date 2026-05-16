@@ -14,7 +14,7 @@ const { useOptionsState } = await import("./useOptionsState");
 const baseProfile: Profile = {
   firstName: "Patrick",
   email: "patrick@example.com",
-  custom: { linkedin: "linkedin.com/in/patrick" },
+  custom: { favouriteColour: "red" },
 };
 
 interface DepBag {
@@ -114,10 +114,10 @@ describe("useOptionsState", () => {
 
     let outcome: { ok: boolean } = { ok: false };
     act(() => {
-      outcome = result.current.addCustomField("github", "github.com/patrick");
+      outcome = result.current.addCustomField("favouriteHobby", "cycling");
     });
     expect(outcome.ok).toBe(true);
-    expect(result.current.profile.custom.github).toBe("github.com/patrick");
+    expect(result.current.profile.custom.favouriteHobby).toBe("cycling");
 
     await waitFor(() => {
       expect(deps.saveProfile).toHaveBeenCalled();
@@ -166,19 +166,19 @@ describe("useOptionsState", () => {
       expect(result.current.loaded).toBe(true);
     });
 
-    expect(result.current.profile.custom.linkedin).toBeDefined();
+    expect(result.current.profile.custom.favouriteColour).toBeDefined();
 
     act(() => {
-      result.current.removeCustomField("linkedin");
+      result.current.removeCustomField("favouriteColour");
     });
 
-    expect(result.current.profile.custom.linkedin).toBeUndefined();
+    expect(result.current.profile.custom.favouriteColour).toBeUndefined();
 
     await waitFor(() => {
       expect(deps.saveProfile).toHaveBeenCalled();
     });
     const saved = deps.saveProfile.mock.calls.at(-1)?.[0] as Profile;
-    expect(saved.custom.linkedin).toBeUndefined();
+    expect(saved.custom.favouriteColour).toBeUndefined();
   });
 
   it("updateLLMSettings merges partial and saves", async () => {

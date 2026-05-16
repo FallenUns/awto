@@ -7,6 +7,7 @@ import { callCloud, type CloudCallOpts } from "./cloud";
 export interface HybridCallOpts {
   ollamaUrl: string;
   ollamaModel: string;
+  ollamaTimeoutMs?: number;
   anthropicApiKey: string;
   anthropicModel: string;
   cloudFallbackEnabled: boolean;
@@ -56,6 +57,7 @@ export async function callHybrid(
   const localOpts: LocalCallOpts = {
     ollamaUrl: opts.ollamaUrl,
     ollamaModel: opts.ollamaModel,
+    timeoutMs: opts.ollamaTimeoutMs,
   };
   const cloudOpts: CloudCallOpts = {
     anthropicApiKey: opts.anthropicApiKey,
