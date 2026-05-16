@@ -16,6 +16,7 @@ export class CloudLLMError extends Error {
 export interface CloudCallOpts {
   anthropicApiKey: string;
   anthropicModel: string;
+  signal?: AbortSignal;
 }
 
 const TOOL_NAME = "submit_mapping";
@@ -40,22 +41,26 @@ export async function callCloud(
 
   let response: Awaited<ReturnType<typeof client.messages.create>>;
   try {
-    response = await client.messages.create({
-      model: opts.anthropicModel,
-      max_tokens: 4096,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: buildUserPrompt(profile, fields) }],
-      tools: [
-        {
-          name: TOOL_NAME,
-          description:
-            "Submit the field-to-profile mapping for the form on the page.",
-          input_schema: inputSchema as never,
-        },
-      ],
-      tool_choice: { type: "tool", name: TOOL_NAME },
-    });
+    response = await client.messages.create(
+      {
+        model: opts.anthropicModel,
+        max_tokens: 4096,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: "user", content: buildUserPrompt(profile, fields) }],
+        tools: [
+          {
+            name: TOOL_NAME,
+            description:
+              "Submit the field-to-profile mapping for the form on the page.",
+            input_schema: inputSchema as never,
+          },
+        ],
+        tool_choice: { type: "tool", name: TOOL_NAME },
+      },
+      opts.signal ? { signal: opts.signal } : undefined
+    );
   } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") throw err;
     throw new CloudLLMError(
       `Anthropic API request failed: ${redact(stringifyError(err), opts.anthropicApiKey)}`,
       err

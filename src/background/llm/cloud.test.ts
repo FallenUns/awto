@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi, type Mock } from "vitest";
 import Anthropic from "@anthropic-ai/sdk";
 import { callCloud, CloudLLMError } from "./cloud";
 import type { Profile } from "@/shared/profile";
@@ -177,5 +177,35 @@ describe("callCloud", () => {
     await expect(callCloud(profile, fields, opts)).rejects.toBeInstanceOf(
       CloudLLMError
     );
+  });
+
+  it("rethrows when external signal aborts the cloud call", async () => {
+    const external = new AbortController();
+    const createMock = vi.fn(
+      (_args, _opts) =>
+        new Promise((_resolve, reject) => {
+          _opts?.signal?.addEventListener?.("abort", () => {
+            const err = new Error("Request aborted");
+            err.name = "AbortError";
+            reject(err);
+          });
+        })
+    );
+    (Anthropic as unknown as Mock).mockImplementation(() => ({
+      messages: { create: createMock },
+    }));
+
+    const promise = callCloud(
+      { firstName: "P", custom: {} },
+      [{ id: 0, selector: "#x", label: "x", placeholder: null, type: "text", required: false }],
+      {
+        anthropicApiKey: "sk-ant-test",
+        anthropicModel: "claude-opus-4-7",
+        signal: external.signal,
+      }
+    );
+
+    external.abort();
+    await expect(promise).rejects.toMatchObject({ name: "AbortError" });
   });
 });
