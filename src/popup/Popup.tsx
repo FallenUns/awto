@@ -86,6 +86,13 @@ export function Popup() {
             <p className="awto-center__text awto-center__text--strong">
               Filled {state.filledCount} field{state.filledCount === 1 ? "" : "s"}
             </p>
+            {state.failedFills.length > 0 && (
+              <p className="awto-center__text awto-muted awto-done__failed">
+                Couldn't fill {state.failedFills.length} field
+                {state.failedFills.length === 1 ? "" : "s"}:{" "}
+                {state.failedFills.map((f) => f.label).join(", ")}
+              </p>
+            )}
           </div>
         )}
 

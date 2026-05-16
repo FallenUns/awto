@@ -14,6 +14,7 @@ import {
 } from "@/shared/profile";
 import { loadProfile, saveProfile } from "@/shared/storage";
 import type {
+  FailedFill,
   FillRow,
   FlowState,
   FlowStatus,
@@ -39,6 +40,7 @@ const INITIAL_STATE: FlowState = {
   missingRows: [],
   skippedRows: [],
   filledCount: 0,
+  failedFills: [],
 };
 
 function defaultQueryActiveTab(): Promise<{ id?: number } | undefined> {
@@ -170,6 +172,7 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
           missingRows,
           skippedRows,
           filledCount: 0,
+          failedFills: [],
         });
       } else if (msg.type === "mapFieldsError") {
         setState((s) => ({
@@ -326,11 +329,22 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
 
       const reply = await sendToTab(tabId, { type: "fillForm", values });
       if (reply.type === "fillFormResult") {
-        setState((s) => ({
-          ...s,
-          status: "done",
-          filledCount: reply.filled,
-        }));
+        setState((s) => {
+          const failedFills: FailedFill[] = reply.failed.map((f) => {
+            const field = s.fields.find((fld) => fld.selector === f.selector);
+            return {
+              fieldId: field?.id ?? -1,
+              label: field?.label ?? f.selector,
+              reason: f.reason,
+            };
+          });
+          return {
+            ...s,
+            status: "done",
+            filledCount: reply.filled,
+            failedFills,
+          };
+        });
       } else {
         setState((s) => ({
           ...s,

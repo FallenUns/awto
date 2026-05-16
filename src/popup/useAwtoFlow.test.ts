@@ -387,6 +387,45 @@ describe("useAwtoFlow", () => {
     expect(result.current.status).toBe("done");
   });
 
+  it("populates failedFills when fillForm returns failed entries", async () => {
+    const deps = makeDeps({
+      sendToTab: vi
+        .fn()
+        .mockImplementation(async (_tabId: number, msg: AwtoMessage) => {
+          if (msg.type === "scanForm") {
+            return { type: "scanFormResult", fields } satisfies AwtoMessage;
+          }
+          if (msg.type === "fillForm") {
+            return {
+              type: "fillFormResult",
+              filled: 0,
+              failed: [
+                { selector: "#fname", reason: "no matching option" },
+              ],
+            } satisfies AwtoMessage;
+          }
+          throw new Error(`unexpected tab message: ${msg.type}`);
+        }),
+    });
+    const { result } = renderFlow(deps);
+
+    await waitFor(() => {
+      expect(result.current.status).toBe("ready");
+    });
+
+    await act(async () => {
+      await result.current.fill();
+    });
+
+    await waitFor(() => {
+      expect(result.current.status).toBe("done");
+    });
+    expect(result.current.state.filledCount).toBe(0);
+    expect(result.current.state.failedFills).toEqual([
+      { fieldId: 0, label: "First name", reason: "no matching option" },
+    ]);
+  });
+
   it("disconnects the port on unmount", async () => {
     let disconnected = false;
     const port = {

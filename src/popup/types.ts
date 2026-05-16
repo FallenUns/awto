@@ -34,6 +34,12 @@ export interface SkippedRow {
   reason: string;
 }
 
+export interface FailedFill {
+  fieldId: number;
+  label: string;
+  reason: string;
+}
+
 export interface FlowState {
   status: FlowStatus;
   error: string | null;
@@ -43,4 +49,5 @@ export interface FlowState {
   missingRows: MissingRow[];
   skippedRows: SkippedRow[];
   filledCount: number;
+  failedFills: FailedFill[];
 }
