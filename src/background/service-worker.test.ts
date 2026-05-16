@@ -271,7 +271,7 @@ describe("handleMessage", () => {
     const external = new AbortController();
 
     await handleMessage(
-      { type: "mapFields", fields: [], profile: { custom: {} } },
+      { type: "mapFields", fields, profile: { custom: {} } },
       { _loadLLMSettings: loadLLMSettings, _callHybrid: callHybrid, signal: external.signal }
     );
 
@@ -290,7 +290,7 @@ describe("handleMessage", () => {
     );
 
     const response = await handleMessage(
-      { type: "mapFields", fields: [], profile: { custom: {} } },
+      { type: "mapFields", fields, profile: { custom: {} } },
       { _loadLLMSettings: loadLLMSettings, _callHybrid: callHybrid }
     );
 
@@ -475,9 +475,9 @@ it("supersedes the previous request when a new message arrives on the same port"
     _callHybrid: callHybrid,
   });
 
-  fireMessage({ type: "mapFields", fields: [], profile: { custom: {} } });
+  fireMessage({ type: "mapFields", fields, profile: { custom: {} } });
   await Promise.resolve();
-  fireMessage({ type: "mapFields", fields: [], profile: { custom: {} } });
+  fireMessage({ type: "mapFields", fields, profile: { custom: {} } });
 
   await new Promise((r) => setTimeout(r, 20));
   expect(callHybrid).toHaveBeenCalledTimes(2);
@@ -503,7 +503,7 @@ it("aborts the in-flight controller on port disconnect", async () => {
     _callHybrid: callHybrid,
   });
 
-  fireMessage({ type: "mapFields", fields: [], profile: { custom: {} } });
+  fireMessage({ type: "mapFields", fields, profile: { custom: {} } });
   await Promise.resolve();
   fireDisconnect();
   await new Promise((r) => setTimeout(r, 20));

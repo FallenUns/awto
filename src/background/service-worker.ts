@@ -1,7 +1,9 @@
 import type { AwtoMessage } from "@/shared/messages";
+import type { FieldMapping } from "@/shared/mapping";
 import { loadLLMSettings, type LLMSettings } from "@/shared/storage";
 import { callHybrid, type HybridResult } from "./llm/hybrid";
 import { pingOllama, listOllamaModels } from "./llm/local";
+import { prefilter } from "./field-prefilter";
 import { cacheKey, getCached, setCached, invalidateTab } from "./result-cache";
 
 export type LoadLLMSettingsFn = () => Promise<LLMSettings>;
@@ -47,22 +49,40 @@ export async function handleMessage(
       }
 
       try {
-        const settings = await loadSettings();
-        const result: HybridResult = await hybrid(
-          message.profile,
+        const { toLLM, skipped: preSkipped } = prefilter(
           message.fields,
-          { ...settings, signal: deps.signal }
+          message.profile
         );
+
+        let llmMappings: FieldMapping[] = [];
+        let source: "local" | "cloud" | "mixed" = "local";
+
+        if (toLLM.length > 0) {
+          const settings = await loadSettings();
+          const result: HybridResult = await hybrid(
+            message.profile,
+            toLLM,
+            { ...settings, signal: deps.signal }
+          );
+          llmMappings = result.response.mappings;
+          source = result.source;
+        }
+
+        // Merge synthetic skip mappings with LLM mappings, sorted by fieldId
+        const allMappings: FieldMapping[] = [...llmMappings, ...preSkipped].sort(
+          (a, b) => a.fieldId - b.fieldId
+        );
+
         if (tabId !== undefined) {
           setCached(cacheKey(tabId, message.fields), {
-            mappings: result.response.mappings,
-            source: result.source,
+            mappings: allMappings,
+            source,
           });
         }
         return {
           type: "mapFieldsResult",
-          mappings: result.response.mappings,
-          source: result.source,
+          mappings: allMappings,
+          source,
         };
       } catch (err) {
         const errorMessage = errorToMessage(err);
