@@ -171,4 +171,29 @@ describe("callHybrid", () => {
     expect(result.source).toBe("local");
     expect(result.response).toEqual(localResponse);
   });
+
+  it("forwards the AbortSignal to both local and cloud calls", async () => {
+    const external = new AbortController();
+    const local = vi.fn().mockRejectedValue(
+      Object.assign(new Error("aborted"), { name: "AbortError" })
+    );
+    const cloud = vi.fn().mockRejectedValue(
+      Object.assign(new Error("aborted"), { name: "AbortError" })
+    );
+
+    await expect(
+      callHybrid(
+        profile,
+        fields,
+        makeOpts({ signal: external.signal }),
+        { _callLocal: local, _callCloud: cloud }
+      )
+    ).rejects.toThrow();
+
+    expect(local).toHaveBeenCalledWith(
+      profile,
+      fields,
+      expect.objectContaining({ signal: external.signal })
+    );
+  });
 });
