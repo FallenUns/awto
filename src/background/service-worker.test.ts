@@ -280,6 +280,23 @@ describe("handleMessage", () => {
       expect.objectContaining({ signal: external.signal })
     );
   });
+
+  it("does not log console.error when mapFields is aborted", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const loadLLMSettings = vi.fn().mockResolvedValue(defaultSettings);
+    const callHybrid = vi.fn().mockRejectedValue(
+      Object.assign(new Error("aborted"), { name: "AbortError" })
+    );
+
+    const response = await handleMessage(
+      { type: "mapFields", fields: [], profile: { custom: {} } },
+      { _loadLLMSettings: loadLLMSettings, _callHybrid: callHybrid }
+    );
+
+    expect(response.type).toBe("mapFieldsError");
+    expect(consoleError).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
 });
 
 function makeMockPort(name = "awto-chat"): {

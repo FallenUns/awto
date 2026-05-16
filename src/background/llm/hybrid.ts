@@ -76,6 +76,11 @@ export async function callHybrid(
     localError = err instanceof Error ? err : new Error(String(err));
   }
 
+  // If the external signal was already aborted, rethrow immediately instead of escalating to cloud
+  if (opts.signal?.aborted) {
+    throw localError ?? new Error("Aborted");
+  }
+
   if (localResponse) {
     if (allConfident(localResponse, opts.confidenceThreshold)) {
       return { response: localResponse, source: "local" };

@@ -45,6 +45,10 @@ export async function handleMessage(
         };
       } catch (err) {
         const errorMessage = errorToMessage(err);
+        if (err instanceof Error && err.name === "AbortError") {
+          // Cancellation — suppress logging; port handler will discard the reply anyway
+          return { type: "mapFieldsError", error: errorMessage };
+        }
         console.error("Awto: mapFields failed:", errorMessage);
         return { type: "mapFieldsError", error: errorMessage };
       }

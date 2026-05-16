@@ -196,4 +196,25 @@ describe("callHybrid", () => {
       expect.objectContaining({ signal: external.signal })
     );
   });
+
+  it("short-circuits and rethrows when external signal aborts during local call", async () => {
+    const external = new AbortController();
+    external.abort();
+    const local = vi.fn().mockRejectedValue(
+      Object.assign(new Error("aborted"), { name: "AbortError" })
+    );
+    const cloud = vi.fn();
+
+    await expect(
+      callHybrid(
+        profile,
+        fields,
+        makeOpts({ signal: external.signal, cloudFallbackEnabled: true, anthropicApiKey: "sk-ant-test" }),
+        { _callLocal: local, _callCloud: cloud }
+      )
+    ).rejects.toThrow();
+
+    expect(local).toHaveBeenCalledTimes(1);
+    expect(cloud).not.toHaveBeenCalled(); // KEY assertion: no escalation after abort
+  });
 });
