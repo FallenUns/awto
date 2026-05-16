@@ -27,6 +27,43 @@ describe("SYSTEM_PROMPT", () => {
   });
 });
 
+describe("SYSTEM_PROMPT type-specific guidance", () => {
+  it("instructs on checkbox handling", () => {
+    expect(SYSTEM_PROMPT).toContain("checkbox");
+    expect(SYSTEM_PROMPT.toLowerCase()).toContain("true");
+    expect(SYSTEM_PROMPT.toLowerCase()).toContain("false");
+  });
+
+  it("instructs on radio handling", () => {
+    expect(SYSTEM_PROMPT.toLowerCase()).toContain("radio");
+  });
+
+  it("instructs on select-options verbatim", () => {
+    expect(SYSTEM_PROMPT.toLowerCase()).toContain("options");
+    expect(SYSTEM_PROMPT.toLowerCase()).toMatch(/verbatim|copy|exactly/);
+  });
+
+  it("instructs on time/date formats", () => {
+    expect(SYSTEM_PROMPT).toContain("HH:MM");
+    expect(SYSTEM_PROMPT).toContain("YYYY-MM-DD");
+  });
+
+  it("lists common phone-label synonyms", () => {
+    const lower = SYSTEM_PROMPT.toLowerCase();
+    expect(lower).toContain("phone");
+    expect(lower).toMatch(/telephone|mobile|tel\b/);
+  });
+
+  it("warns against duplicating values across semantically different fields", () => {
+    const lower = SYSTEM_PROMPT.toLowerCase();
+    expect(lower).toMatch(/duplicate|same value|do not put the same/);
+  });
+
+  it("instructs lower confidence for fuzzy matches", () => {
+    expect(SYSTEM_PROMPT).toMatch(/0\.6|0\.7|0\.8/);
+  });
+});
+
 describe("buildUserPrompt", () => {
   const profile: Profile = {
     firstName: "Patrick",
