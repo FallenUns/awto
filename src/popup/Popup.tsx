@@ -1,52 +1,105 @@
 import { useEffect, useRef } from "react";
-import { Check, AlertCircle, FileX2, Sparkles, BookmarkPlus } from "lucide-react";
-import { StatusBar } from "./StatusBar";
-import { Footer } from "./Footer";
+import { Check, AlertCircle, FileX2 } from "lucide-react";
+import { Header } from "./Header";
+import { FieldRow } from "./FieldRow";
+import { ActionBar } from "./ActionBar";
 import { useAwtoFlow } from "./useAwtoFlow";
+
+export function formatFailureReason(reason: string): string {
+  switch (reason) {
+    case "no matching option":
+      return "The form's dropdown did not have a matching option.";
+    case "selector not found":
+      return "The field was no longer on the page when we tried to fill it.";
+    case "invalid selector":
+      return "The field's selector could not be parsed.";
+    case "unsupported element":
+      return "The field type isn't something we can fill automatically.";
+    default:
+      return reason;
+  }
+}
 
 export function Popup() {
   const { state, status, setMissingValue, fill, retry, cancel, rescan } =
     useAwtoFlow();
-  const feedRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (feedRef.current) {
-      feedRef.current.scrollTop = feedRef.current.scrollHeight;
-    }
-  }, [state.missingRows, status]);
+    if (listRef.current) listRef.current.scrollTop = 0;
+  }, [status]);
 
   const fillCount = state.fillRows.length;
   const missingCount = state.missingRows.length;
-  const skippedCount = state.skippedRows.length;
+  const skipCount = state.skippedRows.length;
   const answeredMissing = state.missingRows.filter(
     (r) => r.userValue.trim() !== ""
   ).length;
-
-  const fillDisabled =
-    fillCount === 0 && state.missingRows.every((r) => r.userValue.trim() === "");
   const totalToFill = fillCount + answeredMissing;
-  const hasFailedFills = state.failedFills.length > 0;
+  const fillDisabled =
+    fillCount === 0 &&
+    state.missingRows.every((r) => r.userValue.trim() === "");
 
   return (
     <div className="awto-popup">
-      <StatusBar status={status} onRescan={rescan} />
+      <Header
+        status={status}
+        readyCount={fillCount}
+        missingCount={missingCount}
+        skipCount={skipCount}
+        chunksDone={state.chunksCompleted}
+        filledCount={state.filledCount}
+        onRescan={rescan}
+      />
 
-      <main className="awto-main" ref={feedRef}>
-        {(status === "scanning" || status === "mapping") && (
-          <div className="awto-chat" role="status" aria-live="polite">
-            <Bubble role="assistant">
-              <span className="awto-typing" aria-label="Awto is thinking">
-                <span className="awto-typing__dot" />
-                <span className="awto-typing__dot" />
-                <span className="awto-typing__dot" />
-              </span>
-              <span className="awto-bubble__text awto-muted">
-                {status === "scanning"
-                  ? "Reading the form…"
-                  : `Working out what to fill…${state.chunksCompleted > 0 ? ` (${state.chunksCompleted} done)` : ""}`}
-              </span>
-            </Bubble>
-          </div>
+      <main className="awto-list" ref={listRef}>
+        {status === "scanning" && (
+          <FieldRow kind="loading" fieldId={-1} label="Scanning the form…" />
+        )}
+
+        {status === "mapping" &&
+          state.loadingFields.map((f) => (
+            <FieldRow
+              key={f.id}
+              kind="loading"
+              fieldId={f.id}
+              label={f.label || `Field ${f.id}`}
+            />
+          ))}
+
+        {(status === "ready" || status === "filling") && (
+          <>
+            {state.fillRows.map((r) => (
+              <FieldRow
+                key={`fill-${r.fieldId}`}
+                kind="fill"
+                fieldId={r.fieldId}
+                label={r.label}
+                value={r.resolvedValue}
+                confidence={r.confidence}
+              />
+            ))}
+            {state.missingRows.map((r) => (
+              <FieldRow
+                key={`missing-${r.fieldId}`}
+                kind="missing"
+                fieldId={r.fieldId}
+                label={r.label}
+                value={r.userValue}
+                promptText={r.promptText}
+                onChangeValue={(v) => setMissingValue(r.fieldId, v)}
+              />
+            ))}
+            {state.skippedRows.map((r) => (
+              <FieldRow
+                key={`skip-${r.fieldId}`}
+                kind="skip"
+                fieldId={r.fieldId}
+                label={r.label}
+                reason={r.reason}
+              />
+            ))}
+          </>
         )}
 
         {status === "no-form" && (
@@ -82,163 +135,29 @@ export function Popup() {
 
         {status === "done" && (
           <div
-            className={`awto-center ${hasFailedFills ? "" : "awto-center--success"}`}
+            className="awto-center awto-center--success"
             role="status"
             aria-live="polite"
           >
-            <div className={`awto-done__icon ${hasFailedFills ? "awto-done__icon--warning" : ""}`}>
-              {hasFailedFills ? (
-                <AlertCircle size={28} strokeWidth={1.8} aria-hidden="true" />
-              ) : (
-                <Check size={28} strokeWidth={2} aria-hidden="true" />
-              )}
+            <div className="awto-done__icon">
+              <Check size={28} strokeWidth={2} aria-hidden="true" />
             </div>
             <p className="awto-center__text awto-center__text--strong">
-              {hasFailedFills
-                ? `Filled ${state.filledCount} field${state.filledCount === 1 ? "" : "s"}, couldn't fill ${state.failedFills.length}`
-                : `Filled ${state.filledCount} field${state.filledCount === 1 ? "" : "s"}`}
+              Filled {state.filledCount} field
+              {state.filledCount === 1 ? "" : "s"}
             </p>
-            {hasFailedFills && (
-              <ul className="awto-done__failed" aria-label="Fields Awto could not fill">
-                {state.failedFills.map((f) => (
-                  <li key={`${f.fieldId}-${f.label}`}>
-                    <strong>{f.label}</strong>: {formatFailureReason(f.reason)}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
-
-        {(status === "ready" || status === "filling") && (
-          <div className="awto-chat" aria-live="polite">
-            <Bubble role="assistant">
-              <span className="awto-bubble__text">
-                <Sparkles size={14} strokeWidth={1.5} className="awto-bubble__icon" aria-hidden="true" />
-                Hi! I had a look at this form.
-              </span>
-            </Bubble>
-
-            {fillCount > 0 && (
-              <Bubble role="assistant">
-                <span className="awto-bubble__text">
-                  I can fill <strong>{fillCount}</strong> field{fillCount === 1 ? "" : "s"} from your profile:
-                </span>
-                <ul className="awto-fill-list">
-                  {state.fillRows.map((row) => (
-                    <li key={row.fieldId} className="awto-fill-list__item">
-                      <span className="awto-fill-list__label">
-                        {row.confidence < 0.85 && (
-                          <span
-                            className="awto-confidence-dot"
-                            title="Low confidence — verify this value"
-                            aria-label="Low confidence"
-                          />
-                        )}
-                        {row.label}
-                      </span>
-                      <span className="awto-fill-list__value">
-                        {row.resolvedValue || <em className="awto-muted">empty</em>}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </Bubble>
-            )}
-
-            {fillCount === 0 && missingCount === 0 && (
-              <Bubble role="assistant">
-                <span className="awto-bubble__text">
-                  Nothing I can fill automatically here.
-                </span>
-              </Bubble>
-            )}
-
-            {missingCount > 0 && (
-              <>
-                <Bubble role="assistant">
-                  <span className="awto-bubble__text">
-                    {fillCount > 0 ? "But I'm missing " : "I need "}
-                    <strong>{missingCount}</strong> thing{missingCount === 1 ? "" : "s"}.
-                    Want to fill them?
-                  </span>
-                  <span className="awto-bubble__hint">
-                    <BookmarkPlus size={12} strokeWidth={1.5} aria-hidden="true" />
-                    I'll save your answers to your profile for next time.
-                  </span>
-                </Bubble>
-
-                {state.missingRows.map((row) => {
-                  const inputId = `missing-${row.fieldId}`;
-                  const helperId = `missing-${row.fieldId}-helper`;
-                  const answered = row.userValue.trim() !== "";
-                  return (
-                    <div key={row.fieldId} className="awto-qa">
-                      <Bubble role="assistant" compact>
-                        <span className="awto-bubble__text awto-bubble__text--question">
-                          {row.promptText || `What's your ${row.label}?`}
-                        </span>
-                      </Bubble>
-                      <div className="awto-qa__input">
-                        <label htmlFor={inputId} className="awto-qa__label">
-                          {row.label}
-                        </label>
-                        <input
-                          id={inputId}
-                          type="text"
-                          className="awto-input"
-                          value={row.userValue}
-                          onChange={(e) =>
-                            setMissingValue(row.fieldId, e.target.value)
-                          }
-                          aria-describedby={helperId}
-                        />
-                        <p
-                          id={helperId}
-                          className={`awto-qa__helper ${answered ? "is-answered" : ""}`}
-                          aria-live="polite"
-                        >
-                          {answered ? (
-                            <>
-                              <Check size={12} strokeWidth={2} aria-hidden="true" />
-                              Saved to your profile as "{row.suggestedKey}"
-                            </>
-                          ) : (
-                            <span className="awto-muted">
-                              Will be saved as "{row.suggestedKey}"
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </>
-            )}
-
-            {skippedCount > 0 && (
-              <Bubble role="system">
-                <span className="awto-bubble__text awto-muted">
-                  Skipped {skippedCount} field{skippedCount === 1 ? "" : "s"} I couldn't map.
-                </span>
-              </Bubble>
-            )}
-
-            {(fillCount > 0 || missingCount > 0) && (
-              <Bubble role="assistant">
-                <span className="awto-bubble__text">
-                  {missingCount > 0 && answeredMissing < missingCount
-                    ? `Fill in the ${missingCount - answeredMissing} above, then tap Fill.`
-                    : `Ready when you are — tap Fill to drop ${totalToFill} value${totalToFill === 1 ? "" : "s"} into the form.`}
-                </span>
-              </Bubble>
+            {state.failedFills.length > 0 && (
+              <p className="awto-center__text awto-muted awto-done__failed">
+                Couldn't fill {state.failedFills.length}:{" "}
+                {state.failedFills.map((f) => f.label).join(", ")}
+              </p>
             )}
           </div>
         )}
       </main>
 
       {(status === "ready" || status === "filling") && (
-        <Footer
+        <ActionBar
           filling={status === "filling"}
           fillDisabled={fillDisabled}
           fillCount={totalToFill}
@@ -246,30 +165,6 @@ export function Popup() {
           onFill={() => void fill()}
         />
       )}
-    </div>
-  );
-}
-
-export function formatFailureReason(reason: string): string {
-  if (reason === "no matching option") {
-    return "the page dropdown did not have a matching option. Please choose it manually.";
-  }
-  return reason;
-}
-
-interface BubbleProps {
-  role: "assistant" | "user" | "system";
-  compact?: boolean;
-  children: React.ReactNode;
-}
-
-function Bubble({ role, compact, children }: BubbleProps) {
-  return (
-    <div className={`awto-bubble awto-bubble--${role} ${compact ? "is-compact" : ""}`}>
-      {role === "assistant" && (
-        <div className="awto-bubble__avatar" aria-hidden="true">A</div>
-      )}
-      <div className="awto-bubble__body">{children}</div>
     </div>
   );
 }
