@@ -55,7 +55,7 @@ function makeHybridResult(): HybridResult {
 }
 
 describe("handleMessage", () => {
-  it("returns mapFieldsResult on mapFields happy path", async () => {
+  it("returns mapFieldsComplete on mapFields happy path", async () => {
     const hybridResult = makeHybridResult();
     const loadLLMSettings = vi.fn().mockResolvedValue(defaultSettings);
     const callHybrid = vi.fn().mockResolvedValue(hybridResult);
@@ -67,12 +67,70 @@ describe("handleMessage", () => {
     });
 
     expect(response).toEqual({
-      type: "mapFieldsResult",
+      type: "mapFieldsComplete",
       mappings: hybridResult.response.mappings,
       source: "local",
     });
     expect(loadLLMSettings).toHaveBeenCalledTimes(1);
-    expect(callHybrid).toHaveBeenCalledWith(profile, fields, defaultSettings);
+    expect(callHybrid).toHaveBeenCalledWith(
+      profile,
+      fields,
+      expect.objectContaining({ ollamaUrl: defaultSettings.ollamaUrl })
+    );
+  });
+
+  it("routes autocomplete-tagged fields through rule-mapper and skips hybrid for them", async () => {
+    const loadLLMSettings = vi.fn().mockResolvedValue(defaultSettings);
+    const callHybrid = vi.fn().mockResolvedValue({
+      response: { mappings: [] },
+      source: "local",
+    });
+
+    const taggedFields: ScannedField[] = [
+      {
+        id: 0,
+        selector: "#a",
+        label: "First name",
+        placeholder: null,
+        type: "text",
+        required: false,
+        autocomplete: "given-name",
+      },
+      {
+        id: 1,
+        selector: "#b",
+        label: "Mystery",
+        placeholder: null,
+        type: "text",
+        required: false,
+      },
+    ];
+    const profileWithName = { firstName: "Patrick", custom: {} };
+
+    await handleMessage(
+      { type: "mapFields", fields: taggedFields, profile: profileWithName },
+      { _loadLLMSettings: loadLLMSettings, _callHybrid: callHybrid }
+    );
+
+    expect(callHybrid).toHaveBeenCalledTimes(1);
+    expect(callHybrid.mock.calls[0]?.[1]).toEqual([taggedFields[1]]);
+  });
+
+  it("bypassCache: true skips the cache lookup and re-runs hybrid", async () => {
+    const hybridResult = makeHybridResult();
+    const loadLLMSettings = vi.fn().mockResolvedValue(defaultSettings);
+    const callHybrid = vi.fn().mockResolvedValue(hybridResult);
+
+    const { setCached, cacheKey, _clearCache } = await import("./result-cache");
+    _clearCache();
+    setCached(cacheKey(99, fields), { mappings: [], source: "cloud" });
+
+    await handleMessage(
+      { type: "mapFields", fields, profile, tabId: 99, bypassCache: true },
+      { _loadLLMSettings: loadLLMSettings, _callHybrid: callHybrid }
+    );
+
+    expect(callHybrid).toHaveBeenCalled();
   });
 
   it("returns mapFieldsError when callHybrid throws", async () => {

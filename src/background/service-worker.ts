@@ -1,15 +1,20 @@
 import type { AwtoMessage } from "@/shared/messages";
 import type { FieldMapping } from "@/shared/mapping";
 import { loadLLMSettings, type LLMSettings } from "@/shared/storage";
-import { callHybrid, type HybridResult } from "./llm/hybrid";
+import { callHybrid } from "./llm/hybrid";
 import { pingOllama, listOllamaModels } from "./llm/local";
 import { prefilter } from "./field-prefilter";
+import { ruleMap } from "./rule-mapper";
+import { chunkArray, runWithConcurrency } from "./concurrency";
 import { cacheKey, getCached, setCached, invalidateTab } from "./result-cache";
 
 export type LoadLLMSettingsFn = () => Promise<LLMSettings>;
 export type CallHybridFn = typeof callHybrid;
 export type PingOllamaFn = typeof pingOllama;
 export type ListOllamaModelsFn = typeof listOllamaModels;
+
+const CHUNK_SIZE = 10;
+const MAX_CONCURRENCY = 4;
 
 export interface HandleMessageDeps {
   _loadLLMSettings?: LoadLLMSettingsFn;
@@ -18,6 +23,7 @@ export interface HandleMessageDeps {
   _listOllamaModels?: ListOllamaModelsFn;
   signal?: AbortSignal;
   tabId?: number;
+  _port?: chrome.runtime.Port | null;
 }
 
 function errorToMessage(err: unknown): string {
@@ -36,7 +42,9 @@ export async function handleMessage(
   switch (message.type) {
     case "mapFields": {
       const tabId = message.tabId ?? deps.tabId;
-      if (tabId !== undefined) {
+
+      // Cache lookup (skipped when bypassCache=true)
+      if (tabId !== undefined && !message.bypassCache) {
         const key = cacheKey(tabId, message.fields);
         const cached = getCached(key);
         if (cached) {
@@ -48,51 +56,78 @@ export async function handleMessage(
         }
       }
 
-      try {
-        const { toLLM, skipped: preSkipped } = prefilter(
-          message.fields,
-          message.profile
-        );
+      // Rule layer (autocomplete-tagged fields resolved deterministically)
+      const { ruleMappings, remaining } = ruleMap(message.fields, message.profile);
 
-        let llmMappings: FieldMapping[] = [];
-        let source: "local" | "cloud" | "mixed" = "local";
+      // Existing prefilter on the remaining set (checkboxes/radios → skip)
+      const { toLLM, skipped: preSkipped } = prefilter(remaining, message.profile);
 
-        if (toLLM.length > 0) {
-          const settings = await loadSettings();
-          const result: HybridResult = await hybrid(
-            message.profile,
-            toLLM,
-            { ...settings, signal: deps.signal }
-          );
-          llmMappings = result.response.mappings;
-          source = result.source;
-        }
-
-        // Merge synthetic skip mappings with LLM mappings, sorted by fieldId
-        const allMappings: FieldMapping[] = [...llmMappings, ...preSkipped].sort(
+      // Stream initial deterministic mappings to the popup if there's a port
+      if (deps._port && ruleMappings.length + preSkipped.length > 0) {
+        const initial = [...ruleMappings, ...preSkipped].sort(
           (a, b) => a.fieldId - b.fieldId
         );
+        deps._port.postMessage({
+          type: "mapFieldsProgress",
+          mappings: initial,
+        });
+      }
 
-        if (tabId !== undefined) {
-          setCached(cacheKey(tabId, message.fields), {
-            mappings: allMappings,
-            source,
+      const llmMappings: FieldMapping[] = [];
+      const sources = new Set<"local" | "cloud" | "mixed">();
+
+      try {
+        if (toLLM.length > 0) {
+          const settings = await loadSettings();
+          const chunks = chunkArray(toLLM, CHUNK_SIZE);
+          await runWithConcurrency(chunks, MAX_CONCURRENCY, async (chunk) => {
+            const result = await hybrid(
+              message.profile,
+              chunk,
+              { ...settings, signal: deps.signal }
+            );
+            llmMappings.push(...result.response.mappings);
+            sources.add(result.source);
+            if (deps._port) {
+              deps._port.postMessage({
+                type: "mapFieldsProgress",
+                mappings: result.response.mappings,
+              });
+            }
           });
         }
-        return {
-          type: "mapFieldsResult",
-          mappings: allMappings,
-          source,
-        };
       } catch (err) {
         const errorMessage = errorToMessage(err);
         if (err instanceof Error && err.name === "AbortError") {
-          // Cancellation — suppress logging; port handler will discard the reply anyway
           return { type: "mapFieldsError", error: errorMessage };
         }
         console.error("Awto: mapFields failed:", errorMessage);
         return { type: "mapFieldsError", error: errorMessage };
       }
+
+      const allMappings: FieldMapping[] = [
+        ...ruleMappings,
+        ...preSkipped,
+        ...llmMappings,
+      ].sort((a, b) => a.fieldId - b.fieldId);
+
+      const source: "local" | "cloud" | "mixed" =
+        sources.size > 1
+          ? "mixed"
+          : (sources.values().next().value ?? "local");
+
+      if (tabId !== undefined) {
+        setCached(cacheKey(tabId, message.fields), {
+          mappings: allMappings,
+          source,
+        });
+      }
+
+      return {
+        type: "mapFieldsComplete",
+        mappings: allMappings,
+        source,
+      };
     }
     case "testOllama": {
       try {
@@ -172,7 +207,12 @@ export function registerPortHandler(
     controller = next;
 
     try {
-      const reply = await handleMessage(message, { ...baseDeps, tabId, signal: next.signal });
+      const reply = await handleMessage(message, {
+        ...baseDeps,
+        tabId,
+        signal: next.signal,
+        _port: port,
+      });
       if (!next.signal.aborted) port.postMessage(reply);
     } catch (err) {
       if (next.signal.aborted) return;
