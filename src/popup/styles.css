@@ -184,12 +184,20 @@ input {
   color: var(--color-accent);
 }
 
+.awto-done__icon--warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
 .awto-done__failed {
   max-width: 320px;
   word-wrap: break-word;
-  text-align: center;
-  margin-top: 4px;
-  font-size: 11px;
+  text-align: left;
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-foreground);
 }
 
 .awto-muted {

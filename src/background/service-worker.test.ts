@@ -13,12 +13,12 @@ import { _clearCache, setCached, cacheKey, getCached } from "./result-cache";
 
 const { handleMessage, registerPortHandler } = await import("./service-worker");
 
-const profile: Profile = { firstName: "Patrick", custom: {} };
+const profile: Profile = { firstName: "Patrick", custom: { favouriteColour: "red" } };
 const fields: ScannedField[] = [
   {
     id: 0,
-    selector: "#fname",
-    label: "First name",
+    selector: "#unknown",
+    label: "Favourite colour",
     placeholder: null,
     type: "text",
     required: true,
@@ -42,7 +42,7 @@ function makeHybridResult(): HybridResult {
         {
           fieldId: 0,
           actionType: "fill",
-          profileKey: "firstName",
+          profileKey: "favouriteColour",
           suggestedKey: null,
           promptText: null,
           reason: null,
@@ -114,6 +114,57 @@ describe("handleMessage", () => {
 
     expect(callHybrid).toHaveBeenCalledTimes(1);
     expect(callHybrid.mock.calls[0]?.[1]).toEqual([taggedFields[1]]);
+  });
+
+  it("does not allow the LLM to map delivery time to dateOfBirth", async () => {
+    const deliveryFields: ScannedField[] = [
+      {
+        id: 0,
+        selector: "#delivery-time",
+        label: "Preferred delivery time",
+        placeholder: null,
+        type: "text",
+        required: false,
+      },
+    ];
+    const loadLLMSettings = vi.fn().mockResolvedValue(defaultSettings);
+    const callHybrid = vi.fn().mockResolvedValue({
+      response: {
+        mappings: [
+          {
+            fieldId: 0,
+            actionType: "fill",
+            profileKey: "dateOfBirth",
+            suggestedKey: null,
+            promptText: null,
+            reason: null,
+            confidence: 0.9,
+          },
+        ],
+      },
+      source: "local",
+    } satisfies HybridResult);
+
+    const response = await handleMessage(
+      {
+        type: "mapFields",
+        fields: deliveryFields,
+        profile: { dateOfBirth: "2000-01-01", custom: {} },
+      },
+      { _loadLLMSettings: loadLLMSettings, _callHybrid: callHybrid }
+    );
+
+    expect(response).toMatchObject({
+      type: "mapFieldsComplete",
+      mappings: [
+        {
+          fieldId: 0,
+          actionType: "missing",
+          suggestedKey: "preferredDeliveryTime",
+          promptText: "What's your preferred delivery time?",
+        },
+      ],
+    });
   });
 
   it("bypassCache: true skips the cache lookup and re-runs hybrid", async () => {

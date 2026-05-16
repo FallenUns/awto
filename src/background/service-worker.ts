@@ -7,6 +7,7 @@ import { prefilter } from "./field-prefilter";
 import { ruleMap } from "./rule-mapper";
 import { chunkArray, runWithConcurrency } from "./concurrency";
 import { cacheKey, getCached, setCached, invalidateTab } from "./result-cache";
+import { sanitizeMappings } from "./mapping-safety";
 
 export type LoadLLMSettingsFn = () => Promise<LLMSettings>;
 export type CallHybridFn = typeof callHybrid;
@@ -86,12 +87,13 @@ export async function handleMessage(
               chunk,
               { ...settings, signal: deps.signal }
             );
-            llmMappings.push(...result.response.mappings);
+            const sanitized = sanitizeMappings(chunk, result.response.mappings);
+            llmMappings.push(...sanitized);
             sources.add(result.source);
             if (deps._port) {
               deps._port.postMessage({
                 type: "mapFieldsProgress",
-                mappings: result.response.mappings,
+                mappings: sanitized,
               });
             }
           });

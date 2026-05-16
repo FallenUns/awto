@@ -85,4 +85,80 @@ describe("ruleMap", () => {
     const { remaining } = ruleMap([f], profile);
     expect(remaining).toEqual([f]);
   });
+
+  it("maps common visible labels without needing the LLM", () => {
+    const richProfile: Profile = {
+      firstName: "FName",
+      middleName: "MName",
+      lastName: "LName",
+      phone: "0404040404",
+      addressLine1: "Address Line Test",
+      addressLine2: "Address Line 2 Test",
+      city: "City Test",
+      state: "State Test",
+      postcode: "0000",
+      country: "CTest",
+      custom: {},
+    };
+
+    const { ruleMappings, remaining } = ruleMap(
+      [
+        field(0, undefined, "First name"),
+        field(1, undefined, "Middle name"),
+        field(2, undefined, "Last name"),
+        field(3, undefined, "Phone number"),
+        field(4, undefined, "Street address"),
+        field(5, undefined, "City"),
+        field(6, undefined, "State"),
+        field(7, undefined, "Zip"),
+        field(8, undefined, "Country"),
+      ],
+      richProfile
+    );
+
+    expect(remaining).toEqual([]);
+    expect(ruleMappings.map((m) => m.profileKey)).toEqual([
+      "firstName",
+      "middleName",
+      "lastName",
+      "phone",
+      "addressLine1",
+      "city",
+      "state",
+      "postcode",
+      "country",
+    ]);
+  });
+
+  it("does not confuse city with address line 2", () => {
+    const richProfile: Profile = {
+      addressLine2: "Address Line 2 Test",
+      city: "City Test",
+      custom: {},
+    };
+
+    const { ruleMappings } = ruleMap(
+      [field(0, undefined, "Address line 2"), field(1, undefined, "City")],
+      richProfile
+    );
+
+    expect(ruleMappings[0]?.profileKey).toBe("addressLine2");
+    expect(ruleMappings[1]?.profileKey).toBe("city");
+  });
+
+  it("uses mobilePhone for mobile labels but falls back to phone", () => {
+    const withBoth: Profile = {
+      phone: "03 9000 0000",
+      mobilePhone: "0404 040 404",
+      custom: {},
+    };
+    expect(
+      ruleMap([field(0, undefined, "Mobile")], withBoth).ruleMappings[0]?.profileKey
+    ).toBe("mobilePhone");
+
+    const phoneOnly: Profile = { phone: "0404 040 404", custom: {} };
+    expect(
+      ruleMap([field(0, undefined, "Mobile")], phoneOnly).ruleMappings[0]?.profileKey
+    ).toBe("phone");
+  });
 });

@@ -359,6 +359,40 @@ describe("useAwtoFlow", () => {
     expect(fillMsg.values).toEqual([{ selector: "#fname", value: "Pat" }]);
   });
 
+  it("resolves computed fullName mappings into a fillable value", async () => {
+    const deps = makeDeps({
+      loadProfile: vi.fn().mockResolvedValue({
+        firstName: "Patrick",
+        lastName: "Adrianus",
+        custom: {},
+      } satisfies Profile),
+      mapReply: {
+        type: "mapFieldsResult",
+        source: "local",
+        mappings: [
+          {
+            fieldId: 0,
+            actionType: "fill",
+            profileKey: "fullName",
+            suggestedKey: null,
+            promptText: null,
+            reason: null,
+            confidence: 1,
+          },
+        ],
+      } satisfies AwtoMessage,
+    });
+    const { result } = renderFlow(deps);
+
+    await waitFor(() => {
+      expect(result.current.status).toBe("ready");
+    });
+
+    expect(result.current.state.fillRows[0]?.resolvedValue).toBe(
+      "Patrick Adrianus"
+    );
+  });
+
   it("transitions to error when no active tab is found", async () => {
     const deps = makeDeps({
       queryActiveTab: vi.fn().mockResolvedValue(undefined),
@@ -424,6 +458,12 @@ describe("useAwtoFlow", () => {
     expect(result.current.state.failedFills).toEqual([
       { fieldId: 0, label: "First name", reason: "no matching option" },
     ]);
+    vi.useFakeTimers();
+    act(() => {
+      vi.advanceTimersByTime(1600);
+    });
+    expect(deps.closePopup).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 
   it("appends rows as mapFieldsProgress chunks arrive and finalizes on complete", async () => {

@@ -25,6 +25,7 @@ export function Popup() {
   const fillDisabled =
     fillCount === 0 && state.missingRows.every((r) => r.userValue.trim() === "");
   const totalToFill = fillCount + answeredMissing;
+  const hasFailedFills = state.failedFills.length > 0;
 
   return (
     <div className="awto-popup">
@@ -80,19 +81,31 @@ export function Popup() {
         )}
 
         {status === "done" && (
-          <div className="awto-center awto-center--success" role="status" aria-live="polite">
-            <div className="awto-done__icon">
-              <Check size={28} strokeWidth={2} aria-hidden="true" />
+          <div
+            className={`awto-center ${hasFailedFills ? "" : "awto-center--success"}`}
+            role="status"
+            aria-live="polite"
+          >
+            <div className={`awto-done__icon ${hasFailedFills ? "awto-done__icon--warning" : ""}`}>
+              {hasFailedFills ? (
+                <AlertCircle size={28} strokeWidth={1.8} aria-hidden="true" />
+              ) : (
+                <Check size={28} strokeWidth={2} aria-hidden="true" />
+              )}
             </div>
             <p className="awto-center__text awto-center__text--strong">
-              Filled {state.filledCount} field{state.filledCount === 1 ? "" : "s"}
+              {hasFailedFills
+                ? `Filled ${state.filledCount} field${state.filledCount === 1 ? "" : "s"}, couldn't fill ${state.failedFills.length}`
+                : `Filled ${state.filledCount} field${state.filledCount === 1 ? "" : "s"}`}
             </p>
-            {state.failedFills.length > 0 && (
-              <p className="awto-center__text awto-muted awto-done__failed">
-                Couldn't fill {state.failedFills.length} field
-                {state.failedFills.length === 1 ? "" : "s"}:{" "}
-                {state.failedFills.map((f) => f.label).join(", ")}
-              </p>
+            {hasFailedFills && (
+              <ul className="awto-done__failed" aria-label="Fields Awto could not fill">
+                {state.failedFills.map((f) => (
+                  <li key={`${f.fieldId}-${f.label}`}>
+                    <strong>{f.label}</strong>: {formatFailureReason(f.reason)}
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         )}
@@ -235,6 +248,13 @@ export function Popup() {
       )}
     </div>
   );
+}
+
+export function formatFailureReason(reason: string): string {
+  if (reason === "no matching option") {
+    return "the page dropdown did not have a matching option. Please choose it manually.";
+  }
+  return reason;
 }
 
 interface BubbleProps {

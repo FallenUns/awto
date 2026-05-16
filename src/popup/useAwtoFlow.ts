@@ -403,11 +403,12 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
 
   useEffect(() => {
     if (state.status !== "done") return;
+    if (state.failedFills.length > 0) return;
     const timer = setTimeout(() => {
       closePopup();
     }, 1500);
     return () => clearTimeout(timer);
-  }, [state.status, closePopup]);
+  }, [state.status, state.failedFills.length, closePopup]);
 
   const retry = useCallback(() => {
     setRunId((n) => n + 1);

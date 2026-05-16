@@ -33,7 +33,7 @@ import type { AwtoMessage } from "@/shared/messages";
   storage: { local: { get: vi.fn().mockResolvedValue({}), set: vi.fn() } },
 };
 
-const { Popup } = await import("./Popup");
+const { Popup, formatFailureReason } = await import("./Popup");
 
 describe("Popup smoke", () => {
   beforeEach(() => {
@@ -76,5 +76,13 @@ describe("Popup confidence dot", () => {
     const dotElement = dots[0] as HTMLElement;
     expect(dotElement.title).toBe("Low confidence — verify this value");
     expect(dotElement.getAttribute("aria-label")).toBe("Low confidence");
+  });
+});
+
+describe("formatFailureReason", () => {
+  it("explains when a dropdown has no matching option", () => {
+    expect(formatFailureReason("no matching option")).toMatch(
+      /dropdown did not have a matching option/i
+    );
   });
 });

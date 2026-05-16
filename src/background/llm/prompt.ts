@@ -20,6 +20,7 @@ Per-type rules:
 - type="select": the value MUST be copied verbatim from the field's "options" list. Do not paraphrase or abbreviate ("VIC" is wrong if options are ["Victoria", ...] — use "Victoria"). If no option matches a profile value, prefer "missing" or "skip" with a lower confidence.
 - type="time": the value must be HH:MM in 24-hour format. If no time-typed profile value is available, "skip".
 - type="date": the value must be YYYY-MM-DD. profile.dateOfBirth already uses this format.
+- Never map profile.dateOfBirth to delivery, pickup, appointment, availability, or preferred-time fields. If the form asks for a delivery/pickup/appointment/preferred time/date and no matching profile key exists, use "missing" or "skip".
 - type="email": map to profile.email or profile.secondaryEmail.
 - type="tel" or labels mentioning "Phone", "Phone number", "Telephone", "Mobile", "Cell", "Tel": map to profile.phone or profile.mobilePhone.
 - type="url": map to profile.website, profile.linkedIn, or profile.github based on label.
