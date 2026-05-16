@@ -74,6 +74,9 @@ export function scanFields(
         ? el.getAttribute("placeholder")
         : null;
 
+    const ac = el.getAttribute("autocomplete");
+    const autocomplete = ac ? ac.trim().toLowerCase() : undefined;
+
     const field: ScannedField = {
       id: nextId++,
       selector: buildSelector(el, ownerDoc),
@@ -81,6 +84,7 @@ export function scanFields(
       placeholder: placeholder && placeholder.length > 0 ? placeholder : null,
       type,
       required: isRequired(el),
+      ...(autocomplete ? { autocomplete } : {}),
     };
 
     if (el instanceof HTMLSelectElement) {

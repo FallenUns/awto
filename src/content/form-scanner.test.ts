@@ -337,4 +337,26 @@ describe("scanFields", () => {
     expect(el).not.toBeNull();
     expect(el?.getAttribute("name")).toBe('foo\\bar');
   });
+
+  it("includes the autocomplete attribute when present", () => {
+    setBody(`
+      <form>
+        <input id="fn" autocomplete="given-name" />
+        <input id="em" autocomplete="email" type="email" />
+        <input id="nope" />
+      </form>
+    `);
+    const fields = scanFields(document);
+    expect(fields[0]?.autocomplete).toBe("given-name");
+    expect(fields[1]?.autocomplete).toBe("email");
+    expect(fields[2]?.autocomplete).toBeUndefined();
+  });
+
+  it("normalizes autocomplete attribute (trims, lowercases tokens)", () => {
+    setBody(`
+      <input id="fn" autocomplete="  Given-Name  " />
+    `);
+    const fields = scanFields(document);
+    expect(fields[0]?.autocomplete).toBe("given-name");
+  });
 });

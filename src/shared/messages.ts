@@ -9,6 +9,7 @@ export interface ScannedField {
   type: string;
   required: boolean;
   options?: string[];
+  autocomplete?: string;
 }
 
 export type AwtoMessage =
