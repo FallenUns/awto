@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import type { LLMSettings } from "@/shared/storage";
-import type { SaveStatus } from "./useOptionsState";
+import type { SaveStatus, TestOllamaConnectionResult } from "./useOptionsState";
 
 const ANTHROPIC_MODELS = [
   "claude-opus-4-7",
@@ -9,17 +9,19 @@ const ANTHROPIC_MODELS = [
   "claude-haiku-4-7",
 ];
 
+const CUSTOM_MODEL_SENTINEL = "__awto_custom__";
+
 interface LLMTabProps {
   settings: LLMSettings;
   saveStatus: SaveStatus;
   onUpdate: (partial: Partial<LLMSettings>) => void;
-  onTestOllama: () => Promise<{ ok: boolean; error?: string }>;
+  onTestOllama: () => Promise<TestOllamaConnectionResult>;
 }
 
 type TestResult =
   | { kind: "idle" }
   | { kind: "testing" }
-  | { kind: "ok" }
+  | { kind: "ok"; modelInstalled?: boolean; warning?: string }
   | { kind: "error"; error: string };
 
 export function LLMTab({
@@ -30,22 +32,62 @@ export function LLMTab({
 }: LLMTabProps) {
   const [showKey, setShowKey] = useState(false);
   const [testResult, setTestResult] = useState<TestResult>({ kind: "idle" });
+  const [installedModels, setInstalledModels] = useState<string[] | null>(null);
+  const [customMode, setCustomMode] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const result = await onTestOllama();
+        if (cancelled) return;
+        if (result.ok && result.models) {
+          setInstalledModels(result.models);
+        }
+      } catch {
+        // silent — user can still click Test connection for visible feedback
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [onTestOllama]);
 
   async function handleTest() {
     setTestResult({ kind: "testing" });
     try {
       const result = await onTestOllama();
-      if (result.ok) {
-        setTestResult({ kind: "ok" });
-      } else {
+      if (!result.ok) {
         setTestResult({ kind: "error", error: result.error ?? "Unknown error" });
+        return;
       }
+      if (result.models) {
+        setInstalledModels(result.models);
+      }
+      setTestResult({
+        kind: "ok",
+        modelInstalled: result.modelInstalled,
+        warning: result.error,
+      });
     } catch (err) {
       setTestResult({
         kind: "error",
         error: err instanceof Error ? err.message : String(err),
       });
     }
+  }
+
+  const modelOptions = installedModels ?? [];
+  const currentModelInList = modelOptions.includes(settings.ollamaModel);
+  const showCustomInput = customMode || (installedModels !== null && !currentModelInList);
+
+  function handleModelSelect(value: string) {
+    if (value === CUSTOM_MODEL_SENTINEL) {
+      setCustomMode(true);
+      return;
+    }
+    setCustomMode(false);
+    onUpdate({ ollamaModel: value });
   }
 
   return (
@@ -88,14 +130,57 @@ export function LLMTab({
           <label htmlFor="ollama-model" className="awto-label">
             Model name
           </label>
-          <input
-            id="ollama-model"
-            className="awto-input"
-            type="text"
-            value={settings.ollamaModel}
-            onChange={(e) => onUpdate({ ollamaModel: e.target.value })}
-            placeholder="llama3.2"
-          />
+          {installedModels === null ? (
+            <input
+              id="ollama-model"
+              className="awto-input"
+              type="text"
+              value={settings.ollamaModel}
+              onChange={(e) => onUpdate({ ollamaModel: e.target.value })}
+              placeholder="llama3.2"
+            />
+          ) : (
+            <select
+              id="ollama-model"
+              className="awto-input"
+              value={
+                showCustomInput
+                  ? CUSTOM_MODEL_SENTINEL
+                  : currentModelInList
+                    ? settings.ollamaModel
+                    : CUSTOM_MODEL_SENTINEL
+              }
+              onChange={(e) => handleModelSelect(e.target.value)}
+            >
+              {modelOptions.length === 0 && (
+                <option value="" disabled>
+                  No models installed — run `ollama pull llama3.2`
+                </option>
+              )}
+              {modelOptions.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+              <option value={CUSTOM_MODEL_SENTINEL}>Custom…</option>
+            </select>
+          )}
+          {showCustomInput && installedModels !== null && (
+            <input
+              className="awto-input"
+              type="text"
+              value={settings.ollamaModel}
+              onChange={(e) => onUpdate({ ollamaModel: e.target.value })}
+              placeholder="llama3.2"
+              style={{ marginTop: 8 }}
+              aria-label="Custom model name"
+            />
+          )}
+          <p className="awto-helper--inline">
+            {installedModels === null
+              ? "Connect to Ollama to see installed models."
+              : `${modelOptions.length} model${modelOptions.length === 1 ? "" : "s"} installed locally.`}
+          </p>
         </div>
 
         <div
@@ -126,13 +211,31 @@ export function LLMTab({
               <span>Test connection</span>
             )}
           </button>
-          {testResult.kind === "ok" && (
+          {testResult.kind === "ok" && testResult.modelInstalled === false && (
+            <span
+              className="awto-badge awto-badge--warn"
+              role="status"
+              aria-live="polite"
+            >
+              Connected · model "{settings.ollamaModel}" not installed
+            </span>
+          )}
+          {testResult.kind === "ok" && testResult.modelInstalled === true && (
             <span
               className="awto-badge awto-badge--success"
               role="status"
               aria-live="polite"
             >
-              Connected
+              Connected · {settings.ollamaModel} ready
+            </span>
+          )}
+          {testResult.kind === "ok" && testResult.modelInstalled === undefined && (
+            <span
+              className="awto-badge awto-badge--success"
+              role="status"
+              aria-live="polite"
+            >
+              Connected{testResult.warning ? ` · ${testResult.warning}` : ""}
             </span>
           )}
           {testResult.kind === "error" && (

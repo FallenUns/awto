@@ -143,6 +143,30 @@ export async function pingOllama(
   }
 }
 
+export async function listOllamaModels(
+  ollamaUrl: string,
+  timeoutMs: number = 3000
+): Promise<{ ok: boolean; models?: string[]; error?: string }> {
+  const url = joinUrl(ollamaUrl, "/api/tags");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) {
+      return { ok: false, error: `HTTP ${res.status}` };
+    }
+    const data = (await res.json()) as { models?: Array<{ name?: unknown }> };
+    const models = (data.models ?? [])
+      .map((m) => (typeof m.name === "string" ? m.name : null))
+      .filter((n): n is string => n !== null);
+    return { ok: true, models };
+  } catch (err) {
+    return { ok: false, error: stringifyError(err) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function stringifyError(err: unknown): string {
   if (err instanceof Error) return err.message;
   return String(err);

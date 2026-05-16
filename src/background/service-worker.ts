@@ -1,16 +1,18 @@
 import type { AwtoMessage } from "@/shared/messages";
 import { loadLLMSettings, type LLMSettings } from "@/shared/storage";
 import { callHybrid, type HybridResult } from "./llm/hybrid";
-import { pingOllama } from "./llm/local";
+import { pingOllama, listOllamaModels } from "./llm/local";
 
 export type LoadLLMSettingsFn = () => Promise<LLMSettings>;
 export type CallHybridFn = typeof callHybrid;
 export type PingOllamaFn = typeof pingOllama;
+export type ListOllamaModelsFn = typeof listOllamaModels;
 
 export interface HandleMessageDeps {
   _loadLLMSettings?: LoadLLMSettingsFn;
   _callHybrid?: CallHybridFn;
   _pingOllama?: PingOllamaFn;
+  _listOllamaModels?: ListOllamaModelsFn;
 }
 
 function errorToMessage(err: unknown): string {
@@ -24,6 +26,7 @@ export async function handleMessage(
   const loadSettings = deps._loadLLMSettings ?? loadLLMSettings;
   const hybrid = deps._callHybrid ?? callHybrid;
   const ping = deps._pingOllama ?? pingOllama;
+  const listModels = deps._listOllamaModels ?? listOllamaModels;
 
   switch (message.type) {
     case "mapFields": {
@@ -48,11 +51,31 @@ export async function handleMessage(
     case "testOllama": {
       try {
         const settings = await loadSettings();
-        const result = await ping(settings.ollamaUrl);
+        const pingResult = await ping(settings.ollamaUrl);
+        if (!pingResult.ok) {
+          return {
+            type: "testOllamaResult",
+            ok: false,
+            error: pingResult.error,
+          };
+        }
+        const tags = await listModels(settings.ollamaUrl);
+        if (!tags.ok) {
+          return {
+            type: "testOllamaResult",
+            ok: true,
+            error: tags.error,
+          };
+        }
+        const models = tags.models ?? [];
+        const modelInstalled = models.some(
+          (m) => m === settings.ollamaModel || m.startsWith(`${settings.ollamaModel}:`)
+        );
         return {
           type: "testOllamaResult",
-          ok: result.ok,
-          error: result.error,
+          ok: true,
+          models,
+          modelInstalled,
         };
       } catch (err) {
         return {

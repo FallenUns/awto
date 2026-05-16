@@ -204,6 +204,12 @@ body {
   background: rgba(239, 68, 68, 0.1);
 }
 
+.awto-badge--warn {
+  color: #F59E0B;
+  border-color: #F59E0B;
+  background: rgba(245, 158, 11, 0.1);
+}
+
 .awto-badge--saved {
   animation: awto-fade 1s ease-out forwards;
 }

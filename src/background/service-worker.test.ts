@@ -114,41 +114,99 @@ describe("handleMessage", () => {
     consoleError.mockRestore();
   });
 
-  it("returns testOllamaResult ok=true on testOllama success", async () => {
+  it("returns testOllamaResult with models and modelInstalled=true when model is installed", async () => {
     const loadLLMSettings = vi.fn().mockResolvedValue(defaultSettings);
     const pingOllama = vi.fn().mockResolvedValue({ ok: true });
+    const listOllamaModels = vi
+      .fn()
+      .mockResolvedValue({ ok: true, models: ["llama3.2:latest", "qwen2.5"] });
 
     const message: AwtoMessage = { type: "testOllama" };
     const response = await handleMessage(message, {
       _loadLLMSettings: loadLLMSettings,
       _pingOllama: pingOllama,
+      _listOllamaModels: listOllamaModels,
     });
 
     expect(response).toEqual({
       type: "testOllamaResult",
       ok: true,
-      error: undefined,
+      models: ["llama3.2:latest", "qwen2.5"],
+      modelInstalled: true,
     });
     expect(pingOllama).toHaveBeenCalledWith(defaultSettings.ollamaUrl);
+    expect(listOllamaModels).toHaveBeenCalledWith(defaultSettings.ollamaUrl);
   });
 
-  it("returns testOllamaResult ok=false with error on testOllama failure", async () => {
+  it("returns modelInstalled=false when configured model is not installed", async () => {
+    const loadLLMSettings = vi.fn().mockResolvedValue(defaultSettings);
+    const pingOllama = vi.fn().mockResolvedValue({ ok: true });
+    const listOllamaModels = vi
+      .fn()
+      .mockResolvedValue({ ok: true, models: ["qwen2.5", "mistral"] });
+
+    const response = await handleMessage(
+      { type: "testOllama" },
+      {
+        _loadLLMSettings: loadLLMSettings,
+        _pingOllama: pingOllama,
+        _listOllamaModels: listOllamaModels,
+      }
+    );
+
+    expect(response).toEqual({
+      type: "testOllamaResult",
+      ok: true,
+      models: ["qwen2.5", "mistral"],
+      modelInstalled: false,
+    });
+  });
+
+  it("returns ok=true with error when listOllamaModels fails after successful ping", async () => {
+    const loadLLMSettings = vi.fn().mockResolvedValue(defaultSettings);
+    const pingOllama = vi.fn().mockResolvedValue({ ok: true });
+    const listOllamaModels = vi
+      .fn()
+      .mockResolvedValue({ ok: false, error: "HTTP 500" });
+
+    const response = await handleMessage(
+      { type: "testOllama" },
+      {
+        _loadLLMSettings: loadLLMSettings,
+        _pingOllama: pingOllama,
+        _listOllamaModels: listOllamaModels,
+      }
+    );
+
+    expect(response).toEqual({
+      type: "testOllamaResult",
+      ok: true,
+      error: "HTTP 500",
+    });
+  });
+
+  it("returns testOllamaResult ok=false with error on ping failure (skips listOllamaModels)", async () => {
     const loadLLMSettings = vi.fn().mockResolvedValue(defaultSettings);
     const pingOllama = vi
       .fn()
       .mockResolvedValue({ ok: false, error: "Connection refused" });
+    const listOllamaModels = vi.fn();
 
-    const message: AwtoMessage = { type: "testOllama" };
-    const response = await handleMessage(message, {
-      _loadLLMSettings: loadLLMSettings,
-      _pingOllama: pingOllama,
-    });
+    const response = await handleMessage(
+      { type: "testOllama" },
+      {
+        _loadLLMSettings: loadLLMSettings,
+        _pingOllama: pingOllama,
+        _listOllamaModels: listOllamaModels,
+      }
+    );
 
     expect(response).toEqual({
       type: "testOllamaResult",
       ok: false,
       error: "Connection refused",
     });
+    expect(listOllamaModels).not.toHaveBeenCalled();
   });
 
   it("returns testOllamaResult ok=false when pingOllama throws", async () => {

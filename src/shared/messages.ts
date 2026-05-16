@@ -28,7 +28,13 @@ export type AwtoMessage =
       failed: Array<{ selector: string; reason: string }>;
     }
   | { type: "testOllama" }
-  | { type: "testOllamaResult"; ok: boolean; error?: string };
+  | {
+      type: "testOllamaResult";
+      ok: boolean;
+      error?: string;
+      models?: string[];
+      modelInstalled?: boolean;
+    };
 
 export type AwtoMessageType = AwtoMessage["type"];
 

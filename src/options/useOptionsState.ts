@@ -39,7 +39,14 @@ export interface UseOptionsStateResult {
   removeCustomField: (key: string) => void;
   replaceProfile: (next: Profile) => void;
   updateLLMSettings: (partial: Partial<LLMSettings>) => void;
-  testOllamaConnection: () => Promise<{ ok: boolean; error?: string }>;
+  testOllamaConnection: () => Promise<TestOllamaConnectionResult>;
+}
+
+export interface TestOllamaConnectionResult {
+  ok: boolean;
+  error?: string;
+  models?: string[];
+  modelInstalled?: boolean;
 }
 
 function defaultSendToRuntime(message: AwtoMessage): Promise<AwtoMessage> {
@@ -256,10 +263,15 @@ export function useOptionsState(
     [scheduleLLMSave]
   );
 
-  const testOllamaConnection = useCallback(async () => {
+  const testOllamaConnection = useCallback(async (): Promise<TestOllamaConnectionResult> => {
     const reply = await sendToRuntime({ type: "testOllama" });
     if (reply.type === "testOllamaResult") {
-      return { ok: reply.ok, error: reply.error };
+      return {
+        ok: reply.ok,
+        error: reply.error,
+        models: reply.models,
+        modelInstalled: reply.modelInstalled,
+      };
     }
     return { ok: false, error: "Unexpected reply from background." };
   }, [sendToRuntime]);
