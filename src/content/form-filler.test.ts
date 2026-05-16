@@ -182,3 +182,73 @@ describe("fillFields", () => {
     });
   });
 });
+
+describe("fillFields select fuzzy match", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("falls back to substring match when exact match fails", () => {
+    setBody(`
+      <select id="state">
+        <option value="vic">Victoria</option>
+        <option value="nsw">New South Wales</option>
+        <option value="qld">Queensland</option>
+      </select>
+    `);
+    const result = fillFields(document, [{ selector: "#state", value: "vic" }]);
+    expect(result.filled).toBe(1);
+    expect(result.failed).toEqual([]);
+
+    // Fuzzy substring: "Vic" should match "Victoria" via text substring
+    setBody(`
+      <select id="state2">
+        <option value="1">Victoria</option>
+        <option value="2">New South Wales</option>
+      </select>
+    `);
+    const r2 = fillFields(document, [{ selector: "#state2", value: "Vic" }]);
+    expect(r2.filled).toBe(1);
+    expect((document.querySelector("#state2") as HTMLSelectElement).value).toBe("1");
+  });
+
+  it("falls back to Levenshtein match for typos", () => {
+    setBody(`
+      <select id="country">
+        <option value="au">Australia</option>
+        <option value="nz">New Zealand</option>
+      </select>
+    `);
+    // Typo: "Austraila" -> Levenshtein 2 from "Australia"
+    const result = fillFields(document, [
+      { selector: "#country", value: "Austraila" },
+    ]);
+    expect(result.filled).toBe(1);
+    expect((document.querySelector("#country") as HTMLSelectElement).value).toBe("au");
+  });
+
+  it("still fails when no fuzzy match is close enough", () => {
+    setBody(`
+      <select id="planet">
+        <option value="e">Earth</option>
+        <option value="v">Venus</option>
+      </select>
+    `);
+    const result = fillFields(document, [{ selector: "#planet", value: "Mars" }]);
+    expect(result.filled).toBe(0);
+    expect(result.failed).toHaveLength(1);
+    expect(result.failed[0]?.reason).toBe("no matching option");
+  });
+
+  it("prefers exact match over fuzzy", () => {
+    setBody(`
+      <select id="x">
+        <option value="a">Australia</option>
+        <option value="b">Austria</option>
+      </select>
+    `);
+    const result = fillFields(document, [{ selector: "#x", value: "Austria" }]);
+    expect(result.filled).toBe(1);
+    expect((document.querySelector("#x") as HTMLSelectElement).value).toBe("b");
+  });
+});
