@@ -106,6 +106,42 @@ chrome.runtime.onMessage.addListener((message: AwtoMessage, _sender, sendRespons
   return true;
 });
 
+export function registerPortHandler(
+  port: chrome.runtime.Port,
+  baseDeps: HandleMessageDeps = {}
+) {
+  let controller: AbortController | null = null;
+
+  port.onMessage.addListener(async (message: AwtoMessage) => {
+    controller?.abort("superseded");
+    const next = new AbortController();
+    controller = next;
+
+    try {
+      const reply = await handleMessage(message, { ...baseDeps, signal: next.signal });
+      if (!next.signal.aborted) port.postMessage(reply);
+    } catch (err) {
+      if (next.signal.aborted) return;
+      port.postMessage({
+        type: "mapFieldsError",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      if (controller === next) controller = null;
+    }
+  });
+
+  port.onDisconnect.addListener(() => {
+    controller?.abort("popup-closed");
+    controller = null;
+  });
+}
+
+chrome.runtime.onConnect?.addListener((port) => {
+  if (port.name !== "awto-chat") return;
+  registerPortHandler(port);
+});
+
 chrome.runtime.onInstalled?.addListener((details) => {
   if (details.reason === "install") {
     void chrome.runtime.openOptionsPage();

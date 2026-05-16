@@ -10,7 +10,7 @@ import type { HybridResult } from "./llm/hybrid";
   },
 };
 
-const { handleMessage } = await import("./service-worker");
+const { handleMessage, registerPortHandler } = await import("./service-worker");
 
 const profile: Profile = { firstName: "Patrick", custom: {} };
 const fields: ScannedField[] = [
@@ -280,4 +280,82 @@ describe("handleMessage", () => {
       expect.objectContaining({ signal: external.signal })
     );
   });
+});
+
+function makeMockPort(name = "awto-chat"): {
+  port: chrome.runtime.Port;
+  fireMessage: (msg: AwtoMessage) => void;
+  fireDisconnect: () => void;
+  posted: AwtoMessage[];
+} {
+  const messageListeners: Array<(msg: AwtoMessage) => void> = [];
+  const disconnectListeners: Array<() => void> = [];
+  const posted: AwtoMessage[] = [];
+  const port = {
+    name,
+    onMessage: { addListener: (fn: (msg: AwtoMessage) => void) => messageListeners.push(fn) },
+    onDisconnect: { addListener: (fn: () => void) => disconnectListeners.push(fn) },
+    postMessage: (msg: AwtoMessage) => posted.push(msg),
+    disconnect: () => disconnectListeners.forEach((fn) => fn()),
+  } as unknown as chrome.runtime.Port;
+  return {
+    port,
+    fireMessage: (msg) => messageListeners.forEach((fn) => fn(msg)),
+    fireDisconnect: () => disconnectListeners.forEach((fn) => fn()),
+    posted,
+  };
+}
+
+it("supersedes the previous request when a new message arrives on the same port", async () => {
+  const callHybrid = vi
+    .fn()
+    .mockImplementation(
+      (_profile, _fields, opts: { signal?: AbortSignal }) =>
+        new Promise((_resolve, reject) =>
+          opts.signal?.addEventListener("abort", () =>
+            reject(Object.assign(new Error("aborted"), { name: "AbortError" }))
+          )
+        )
+    );
+  const { port, fireMessage, posted } = makeMockPort();
+
+  registerPortHandler(port, {
+    _loadLLMSettings: vi.fn().mockResolvedValue(defaultSettings),
+    _callHybrid: callHybrid,
+  });
+
+  fireMessage({ type: "mapFields", fields: [], profile: { custom: {} } });
+  await Promise.resolve();
+  fireMessage({ type: "mapFields", fields: [], profile: { custom: {} } });
+
+  await new Promise((r) => setTimeout(r, 20));
+  expect(callHybrid).toHaveBeenCalledTimes(2);
+  expect(callHybrid.mock.calls[0]?.[2].signal.aborted).toBe(true);
+  expect(posted).toEqual([]); // first call's superseded reply is suppressed; second is still pending
+});
+
+it("aborts the in-flight controller on port disconnect", async () => {
+  const callHybrid = vi
+    .fn()
+    .mockImplementation(
+      (_profile, _fields, opts: { signal?: AbortSignal }) =>
+        new Promise((_resolve, reject) =>
+          opts.signal?.addEventListener("abort", () =>
+            reject(Object.assign(new Error("aborted"), { name: "AbortError" }))
+          )
+        )
+    );
+  const { port, fireMessage, fireDisconnect } = makeMockPort();
+
+  registerPortHandler(port, {
+    _loadLLMSettings: vi.fn().mockResolvedValue(defaultSettings),
+    _callHybrid: callHybrid,
+  });
+
+  fireMessage({ type: "mapFields", fields: [], profile: { custom: {} } });
+  await Promise.resolve();
+  fireDisconnect();
+  await new Promise((r) => setTimeout(r, 20));
+
+  expect(callHybrid.mock.calls[0]?.[2].signal.aborted).toBe(true);
 });
