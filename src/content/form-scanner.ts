@@ -174,12 +174,10 @@ function isSimpleId(id: string): boolean {
 }
 
 function cssEscape(value: string): string {
-  if (typeof (globalThis as { CSS?: { escape?: (v: string) => string } }).CSS
-    ?.escape === "function") {
-    return (globalThis as unknown as { CSS: { escape: (v: string) => string } })
-      .CSS.escape(value);
-  }
-  return value.replace(/(["\\])/g, "\\$1");
+  return value.replace(/[^a-zA-Z0-9_-]/g, (c) => {
+    const code = c.charCodeAt(0);
+    return code >= 0x80 ? c : `\\${code.toString(16)} `;
+  });
 }
 
 function buildNthSelector(el: HTMLElement): string {

@@ -200,6 +200,29 @@ npm run build    # → dist/
 - Firefox port. Deferred to v2.
 - Whether to add a keyboard shortcut. Deferred — see if toolbar click is enough friction.
 
+## Security Advisories — Accepted Residual
+
+After dependency upgrades on 2026-05-16, `npm audit` reports **2 high-severity advisories** that are explicitly accepted:
+
+- **rollup `<2.80.0`** — Arbitrary File Write via Path Traversal ([GHSA-mw96-cpmx-2vgc](https://github.com/advisories/GHSA-mw96-cpmx-2vgc)). Pinned at `2.79.2` by `@crxjs/vite-plugin@2.4.0` (exact version pin, not a range). The advisory's actual exploit scenario is **Rollup 4**, retroactively applied to all 2.x. Rollup 2 is unmaintained.
+
+**Why accepted:**
+1. It's a **devDependency** — never ships in `dist/`. The bundled extension does not include rollup.
+2. The vulnerability requires feeding malicious input through the bundler. For a local developer build of your own source, the practical attack surface is zero.
+3. Forcing the audit fix downgrades `@crxjs/vite-plugin` from `2.4.0` (stable) to `1.0.14` (major regression of build tooling).
+4. Overriding rollup to 4.x would break `@crxjs/vite-plugin` because it depends on rollup 2.x APIs.
+
+**Resolution path:** wait for `@crxjs/vite-plugin` to release a version that uses a maintained rollup (3.x or 4.x). Check periodically.
+
+Vulnerabilities fixed in the same upgrade pass:
+- happy-dom 15 → 20.9.0 (critical RCE — GHSA-37j7-fg3j-429f, GHSA-w4gp-fjgq-3q4g, GHSA-6q6h-j7hj-3r64)
+- vite 5 → 6.4.2 (moderate path traversal — GHSA-4w7w-66w2-5vf9)
+- vitest 2 → 3.2.4 (transitively eliminated bundled vite 5)
+- esbuild → ^0.25 via `overrides` (moderate dev-server SSRF — GHSA-67mh-4wv8-2f99)
+- @crxjs/vite-plugin 2.0.0-beta.28 → 2.4.0 (stable)
+
+Side fix during upgrade: `cssEscape` in [src/content/form-scanner.ts](src/content/form-scanner.ts) switched from JS-style `\"` escape to CSS spec hex-code escape (`\22 `). happy-dom 20 strictly enforces the CSS spec and rejected the JS-style form.
+
 ## Sources Consulted (2026-05-15)
 
 - [Ollama Structured Outputs docs](https://docs.ollama.com/capabilities/structured-outputs)
