@@ -33,7 +33,7 @@ export async function handleMessage(
 
   switch (message.type) {
     case "mapFields": {
-      const tabId = deps.tabId;
+      const tabId = message.tabId ?? deps.tabId;
       if (tabId !== undefined) {
         const key = cacheKey(tabId, message.fields);
         const cached = getCached(key);

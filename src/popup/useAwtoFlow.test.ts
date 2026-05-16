@@ -255,6 +255,7 @@ describe("useAwtoFlow", () => {
     ) as Extract<AwtoMessage, { type: "mapFields" }>;
     expect(mapMsg.fields).toEqual(fields);
     expect(mapMsg.profile).toEqual(baseProfile);
+    expect(mapMsg.tabId).toBe(42);
   });
 
   it("transitions to ready with categorised rows on mapFields success", async () => {

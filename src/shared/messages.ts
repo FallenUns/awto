@@ -14,7 +14,7 @@ export interface ScannedField {
 export type AwtoMessage =
   | { type: "scanForm" }
   | { type: "scanFormResult"; fields: ScannedField[] }
-  | { type: "mapFields"; fields: ScannedField[]; profile: Profile }
+  | { type: "mapFields"; fields: ScannedField[]; profile: Profile; tabId?: number }
   | {
       type: "mapFieldsResult";
       mappings: FieldMapping[];

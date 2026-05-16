@@ -255,6 +255,7 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
           type: "mapFields",
           fields,
           profile,
+          tabId: tab.id,
         });
         // The reply arrives via the port.onMessage listener registered in
         // the connect-effect above.

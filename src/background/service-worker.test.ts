@@ -325,8 +325,8 @@ describe("handleMessage with result cache", () => {
     });
 
     const response = await handleMessage(
-      { type: "mapFields", fields, profile },
-      { _loadLLMSettings: loadLLMSettings, _callHybrid: callHybrid, tabId: 42 }
+      { type: "mapFields", fields, profile, tabId: 42 },
+      { _loadLLMSettings: loadLLMSettings, _callHybrid: callHybrid }
     );
 
     expect(response).toEqual({
@@ -344,8 +344,8 @@ describe("handleMessage with result cache", () => {
     const callHybrid = vi.fn().mockResolvedValue(hybridResult);
 
     await handleMessage(
-      { type: "mapFields", fields, profile },
-      { _loadLLMSettings: loadLLMSettings, _callHybrid: callHybrid, tabId: 7 }
+      { type: "mapFields", fields, profile, tabId: 7 },
+      { _loadLLMSettings: loadLLMSettings, _callHybrid: callHybrid }
     );
 
     const stored = getCached(cacheKey(7, fields));
@@ -360,8 +360,8 @@ describe("handleMessage with result cache", () => {
     const callHybrid = vi.fn().mockRejectedValue(new Error("boom"));
 
     await handleMessage(
-      { type: "mapFields", fields, profile },
-      { _loadLLMSettings: loadLLMSettings, _callHybrid: callHybrid, tabId: 8 }
+      { type: "mapFields", fields, profile, tabId: 8 },
+      { _loadLLMSettings: loadLLMSettings, _callHybrid: callHybrid }
     );
 
     expect(getCached(cacheKey(8, fields))).toBeNull();
@@ -375,8 +375,8 @@ describe("handleMessage with result cache", () => {
     );
 
     await handleMessage(
-      { type: "mapFields", fields, profile },
-      { _loadLLMSettings: loadLLMSettings, _callHybrid: callHybrid, tabId: 9 }
+      { type: "mapFields", fields, profile, tabId: 9 },
+      { _loadLLMSettings: loadLLMSettings, _callHybrid: callHybrid }
     );
 
     expect(getCached(cacheKey(9, fields))).toBeNull();
@@ -393,6 +393,43 @@ describe("handleMessage with result cache", () => {
     );
 
     expect(callHybrid).toHaveBeenCalledTimes(1);
+  });
+
+  it("prefers message.tabId over deps.tabId", async () => {
+    const hybridResult = makeHybridResult();
+    const loadLLMSettings = vi.fn().mockResolvedValue(defaultSettings);
+    const callHybrid = vi.fn().mockResolvedValue(hybridResult);
+
+    await handleMessage(
+      { type: "mapFields", fields, profile, tabId: 99 },
+      {
+        _loadLLMSettings: loadLLMSettings,
+        _callHybrid: callHybrid,
+        tabId: 42,
+      }
+    );
+
+    const stored = getCached(cacheKey(99, fields));
+    expect(stored).not.toBeNull();
+    expect(getCached(cacheKey(42, fields))).toBeNull();
+  });
+
+  it("falls back to deps.tabId when message.tabId is undefined", async () => {
+    const hybridResult = makeHybridResult();
+    const loadLLMSettings = vi.fn().mockResolvedValue(defaultSettings);
+    const callHybrid = vi.fn().mockResolvedValue(hybridResult);
+
+    await handleMessage(
+      { type: "mapFields", fields, profile },
+      {
+        _loadLLMSettings: loadLLMSettings,
+        _callHybrid: callHybrid,
+        tabId: 55,
+      }
+    );
+
+    const stored = getCached(cacheKey(55, fields));
+    expect(stored).not.toBeNull();
   });
 });
 
