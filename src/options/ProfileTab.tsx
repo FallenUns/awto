@@ -7,6 +7,15 @@ import {
   type Profile,
 } from "@/shared/profile";
 import type { SaveStatus } from "./useOptionsState";
+import { TITLES, PRONOUNS, COUNTRIES } from "./countries";
+
+const ENUM_FIELDS: Partial<Record<BuiltInKey, readonly string[]>> = {
+  title: TITLES,
+  pronouns: PRONOUNS,
+  country: COUNTRIES,
+};
+
+const CUSTOM_SENTINEL = "__custom__";
 
 interface FieldDef {
   key: BuiltInKey;
@@ -259,6 +268,52 @@ export function ProfileTab({
             {section.fields.map((field) => {
               const id = `profile-${field.key}`;
               const value = profile[field.key] ?? "";
+              const enumOptions = ENUM_FIELDS[field.key];
+              if (enumOptions) {
+                const isCustom =
+                  value !== "" && !enumOptions.includes(value);
+                return (
+                  <div key={field.key} className="awto-field">
+                    <label className="awto-label" htmlFor={id}>
+                      {field.label}
+                    </label>
+                    <select
+                      id={id}
+                      className="awto-input"
+                      value={isCustom ? CUSTOM_SENTINEL : value}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v === CUSTOM_SENTINEL) {
+                          if (!isCustom) onUpdate(field.key, " ");
+                          return;
+                        }
+                        onUpdate(field.key, v);
+                      }}
+                    >
+                      <option value="">Choose…</option>
+                      {enumOptions.map((o) => (
+                        <option key={o} value={o}>
+                          {o}
+                        </option>
+                      ))}
+                      <option value={CUSTOM_SENTINEL}>Other…</option>
+                    </select>
+                    {isCustom && (
+                      <input
+                        type="text"
+                        className="awto-input"
+                        aria-label={`Custom ${field.label}`}
+                        value={value.trim() === "" ? "" : value}
+                        onChange={(e) => onUpdate(field.key, e.target.value)}
+                        style={{ marginTop: 8 }}
+                      />
+                    )}
+                    {field.helper && (
+                      <p className="awto-helper--inline">{field.helper}</p>
+                    )}
+                  </div>
+                );
+              }
               return (
                 <div key={field.key} className="awto-field">
                   <label className="awto-label" htmlFor={id}>
