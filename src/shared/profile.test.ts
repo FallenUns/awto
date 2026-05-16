@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   ProfileSchema,
   EMPTY_PROFILE,
+  BUILT_IN_KEYS,
   profileKeys,
   getProfileValue,
   setProfileValue,
@@ -98,6 +99,43 @@ describe("getProfileValue", () => {
 
   it("returns undefined for an unknown key", () => {
     expect(getProfileValue(profile, "nonexistent")).toBeUndefined();
+  });
+
+  it("returns computed fullName when first and last name are present", () => {
+    const named: Profile = ProfileSchema.parse({
+      firstName: "Patrick",
+      lastName: "Adrianus",
+    });
+    expect(getProfileValue(named, "fullName")).toBe("Patrick Adrianus");
+  });
+
+  it("BUILT_IN_KEYS includes unitNumber", () => {
+    expect(BUILT_IN_KEYS).toContain("unitNumber");
+  });
+
+  it("ProfileSchema accepts unitNumber", () => {
+    const result = ProfileSchema.safeParse({ unitNumber: "5" });
+    expect(result.success).toBe(true);
+  });
+
+  it("getProfileValue composes addressLine1WithUnit from unitNumber + addressLine1", () => {
+    const p = { unitNumber: "5", addressLine1: "206 La Trobe St", custom: {} };
+    expect(getProfileValue(p as Profile, "addressLine1WithUnit")).toBe(
+      "5/206 La Trobe St"
+    );
+  });
+
+  it("getProfileValue returns addressLine1 unchanged when no unitNumber", () => {
+    const p = { addressLine1: "206 La Trobe St", custom: {} };
+    expect(getProfileValue(p as Profile, "addressLine1WithUnit")).toBe(
+      "206 La Trobe St"
+    );
+  });
+
+  it("getProfileValue returns undefined for addressLine1WithUnit when no addressLine1", () => {
+    expect(
+      getProfileValue({ custom: {} } as Profile, "addressLine1WithUnit")
+    ).toBeUndefined();
   });
 });
 

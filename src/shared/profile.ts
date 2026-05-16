@@ -21,6 +21,7 @@ export const ProfileSchema = z.object({
   mobilePhone: z.string().optional(),
 
   // Address
+  unitNumber: z.string().optional(),
   addressLine1: z.string().optional(),
   addressLine2: z.string().optional(),
   suburb: z.string().optional(),
@@ -70,6 +71,7 @@ export const BUILT_IN_KEYS = [
   "secondaryEmail",
   "phone",
   "mobilePhone",
+  "unitNumber",
   "addressLine1",
   "addressLine2",
   "suburb",
@@ -115,6 +117,17 @@ export function getProfileValue(
   profile: Profile,
   key: string
 ): string | undefined {
+  if (key === "fullName") {
+    const first = profile.firstName?.trim();
+    const last = profile.lastName?.trim();
+    if (first && last) return `${first} ${last}`;
+  }
+  if (key === "addressLine1WithUnit") {
+    const line = profile.addressLine1?.trim();
+    if (!line) return undefined;
+    const unit = profile.unitNumber?.trim();
+    return unit ? `${unit}/${line}` : line;
+  }
   if (isBuiltInKey(key)) return profile[key];
   return profile.custom[key];
 }

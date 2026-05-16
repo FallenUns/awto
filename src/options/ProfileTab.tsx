@@ -93,6 +93,13 @@ const SECTIONS: SectionDef[] = [
     title: "Address",
     fields: [
       {
+        key: "unitNumber",
+        label: "Unit / Apt (optional)",
+        placeholder: "5 or Apt 12",
+        helper:
+          "Will be prepended to your street address on forms that don't have a separate unit field.",
+      },
+      {
         key: "addressLine1",
         label: "Address line 1",
         autocomplete: "address-line1",

@@ -215,3 +215,29 @@ describe("SYSTEM_PROMPT fullName rule", () => {
     expect(SYSTEM_PROMPT).toContain("fullName");
   });
 });
+
+describe("buildUserPrompt addressLine1WithUnit composite", () => {
+  it("buildUserPrompt injects addressLine1WithUnit when both unit and street exist", () => {
+    const profile: Profile = {
+      unitNumber: "5",
+      addressLine1: "206 La Trobe St",
+      custom: {},
+    };
+    const prompt = buildUserPrompt(profile, []);
+    expect(prompt).toContain("addressLine1WithUnit: 5/206 La Trobe St");
+  });
+
+  it("buildUserPrompt does NOT inject addressLine1WithUnit when no unit", () => {
+    const profile: Profile = {
+      addressLine1: "206 La Trobe St",
+      custom: {},
+    };
+    const prompt = buildUserPrompt(profile, []);
+    expect(prompt).not.toMatch(/^- addressLine1WithUnit:/m);
+  });
+
+  it("SYSTEM_PROMPT instructs on unit/apt handling", () => {
+    expect(SYSTEM_PROMPT.toLowerCase()).toMatch(/unit|apartment|apt/);
+    expect(SYSTEM_PROMPT).toContain("addressLine1WithUnit");
+  });
+});

@@ -37,6 +37,8 @@ Common label synonyms to map to a single profile key:
 
 When the form has a single name-style field labeled "Name", "Full name", "Customer name", "Your name", or similar, map to "fullName" (the firstName + lastName composite) — do NOT use firstName alone.
 
+For street address fields: if the form has a SEPARATE field labeled "Unit", "Apt", "Apartment", "Suite", "#", or has autocomplete="address-line2", map that field to "unitNumber". If the form has only ONE street-address field and the profile has unitNumber set, use "addressLine1WithUnit" (the composed "unit/street" string) — do NOT use just "addressLine1" alone in that case.
+
 Rules:
 - "profileKey" MUST be one of the profile keys listed in the user prompt. Never invent profile keys for "fill".
 - Use the profile VALUES as semantic hints (e.g. an email-looking value matches an <input type="email">).
@@ -57,6 +59,14 @@ export function buildUserPrompt(
   if (first && last) {
     profileLines.push(
       `- fullName: ${first} ${last}    (computed; use for single name-style form fields)`
+    );
+  }
+
+  const unit = profile.unitNumber?.trim();
+  const line1 = profile.addressLine1?.trim();
+  if (unit && line1) {
+    profileLines.push(
+      `- addressLine1WithUnit: ${unit}/${line1}    (computed; use for single street-address fields when the form has no separate unit/apt input)`
     );
   }
 
