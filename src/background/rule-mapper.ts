@@ -133,9 +133,10 @@ export function ruleMap(
   const remaining: ScannedField[] = [];
 
   for (const field of fields) {
+    const labelKey = keyFromLabel(field, profile);
     const autocompleteKey = keyFromAutocomplete(field.autocomplete);
     const keyOrNull =
-      autocompleteKey !== undefined ? autocompleteKey : keyFromLabel(field, profile);
+      labelKey !== undefined ? labelKey : autocompleteKey;
     if (keyOrNull === undefined) {
       remaining.push(field);
       continue;

@@ -161,4 +161,21 @@ describe("ruleMap", () => {
       ruleMap([field(0, undefined, "Mobile")], phoneOnly).ruleMappings[0]?.profileKey
     ).toBe("phone");
   });
+
+  it("prefers the visible label over a misleading autocomplete token", () => {
+    const { ruleMappings } = ruleMap(
+      [
+        {
+          ...field(0, "address-line1", "City"),
+          autocomplete: "address-line1",
+        },
+      ],
+      { addressLine1: "206 327 La Trobe St", city: "Melbourne", custom: {} }
+    );
+
+    expect(ruleMappings[0]).toMatchObject({
+      actionType: "fill",
+      profileKey: "city",
+    });
+  });
 });

@@ -15,10 +15,14 @@ function field(id: number, label: string, type = "text"): ScannedField {
 }
 
 function dobFill(fieldId: number): FieldMapping {
+  return fill(fieldId, "dateOfBirth");
+}
+
+function fill(fieldId: number, profileKey: string): FieldMapping {
   return {
     fieldId,
     actionType: "fill",
-    profileKey: "dateOfBirth",
+    profileKey,
     suggestedKey: null,
     promptText: null,
     reason: null,
@@ -49,6 +53,148 @@ describe("sanitizeMappings", () => {
       suggestedKey: "preferredDeliveryTime",
       promptText: "What's your preferred delivery time?",
       confidence: 1,
+    });
+  });
+
+  it("turns name values on delivery time into a missing field", () => {
+    const sanitized = sanitizeMappings(
+      [field(0, "Preferred delivery time", "time")],
+      [fill(0, "preferredName")]
+    );
+
+    expect(sanitized[0]).toMatchObject({
+      fieldId: 0,
+      actionType: "missing",
+      profileKey: null,
+      suggestedKey: "preferredDeliveryTime",
+      promptText: "What's your preferred delivery time?",
+      confidence: 1,
+    });
+  });
+
+  it("allows a specific saved delivery time key", () => {
+    const mapping = fill(0, "preferredDeliveryTime");
+    expect(
+      sanitizeMappings([field(0, "Preferred delivery time", "time")], [mapping])
+    ).toEqual([mapping]);
+  });
+
+  it("blocks wrong values on sensitive and account fields", () => {
+    const sanitized = sanitizeMappings(
+      [
+        field(0, "User ID"),
+        field(1, "Password", "password"),
+        field(2, "Credit Card Number"),
+        field(3, "Card Verification Code"),
+        field(4, "Social Security Number"),
+      ],
+      [
+        fill(0, "addressLine2"),
+        fill(1, "preferredName"),
+        fill(2, "firstName"),
+        fill(3, "middleName"),
+        fill(4, "taxFileNumber"),
+      ]
+    );
+
+    expect(sanitized[0]).toMatchObject({
+      actionType: "missing",
+      suggestedKey: "userId",
+    });
+    expect(sanitized[1]).toMatchObject({
+      actionType: "skip",
+      reason: "Sensitive credential — fill manually",
+    });
+    expect(sanitized[2]).toMatchObject({
+      actionType: "skip",
+      reason: "Payment field — fill manually",
+    });
+    expect(sanitized[3]).toMatchObject({
+      actionType: "skip",
+      reason: "Payment field — fill manually",
+    });
+    expect(sanitized[4]).toMatchObject({
+      actionType: "skip",
+      reason: "Sensitive government identifier — fill manually",
+    });
+  });
+
+  it("allows semantically compatible profile keys", () => {
+    const mappings = [
+      fill(0, "title"),
+      fill(1, "fullName"),
+      fill(2, "phone"),
+      fill(3, "mobilePhone"),
+      fill(4, "email"),
+      fill(5, "website"),
+      fill(6, "dateOfBirth"),
+    ];
+
+    expect(
+      sanitizeMappings(
+        [
+          field(0, "Title"),
+          field(1, "Full Name"),
+          field(2, "Home Phone"),
+          field(3, "Cell Phone"),
+          field(4, "E-mail"),
+          field(5, "Web Site"),
+          field(6, "Date Of Birth"),
+        ],
+        mappings
+      )
+    ).toEqual(mappings);
+  });
+
+  it("converts mismatched profile keys into missing questions", () => {
+    const sanitized = sanitizeMappings(
+      [
+        field(0, "Middle Initial"),
+        field(1, "Home Phone"),
+        field(2, "Fax"),
+        field(3, "Age"),
+        field(4, "Birth Place"),
+        field(5, "E-mail"),
+        field(6, "Web Site"),
+      ],
+      [
+        fill(0, "firstName"),
+        fill(1, "title"),
+        fill(2, "addressLine1"),
+        fill(3, "addressLine1"),
+        fill(4, "addressLine2"),
+        fill(5, "addressLine2"),
+        fill(6, "addressLine2"),
+      ]
+    );
+
+    expect(sanitized[0]).toMatchObject({
+      actionType: "missing",
+      suggestedKey: "middleInitial",
+    });
+    expect(sanitized[1]).toMatchObject({
+      actionType: "missing",
+      suggestedKey: "homePhone",
+    });
+    expect(sanitized[2]).toMatchObject({
+      actionType: "skip",
+      reason: "Fax number not in profile",
+    });
+    expect(sanitized[3]).toMatchObject({
+      actionType: "missing",
+      suggestedKey: "age",
+    });
+    expect(sanitized[4]).toMatchObject({
+      actionType: "missing",
+      suggestedKey: "birthPlace",
+    });
+    expect(sanitized[5]).toMatchObject({
+      actionType: "missing",
+      suggestedKey: "email",
+    });
+    expect(sanitized[6]).toMatchObject({
+      actionType: "missing",
+      suggestedKey: "webSite",
     });
   });
 });

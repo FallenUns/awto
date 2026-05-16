@@ -72,6 +72,38 @@ describe("scanFields", () => {
     expect(fields[0]?.placeholder).toBe("Email");
   });
 
+  it("extracts labels from the preceding table cell in the same row", () => {
+    setBody(`
+      <form>
+        <table>
+          <tr>
+            <td>First Name</td>
+            <td><input type="text" name="first" /></td>
+          </tr>
+          <tr>
+            <td>Credit Card Number</td>
+            <td><input type="text" name="cc" /></td>
+          </tr>
+        </table>
+      </form>
+    `);
+    const fields = scanFields(document);
+    expect(fields[0]?.label).toBe("First Name");
+    expect(fields[1]?.label).toBe("Credit Card Number");
+  });
+
+  it("keeps the visible label even when the HTML name is misleading", () => {
+    setBody(`
+      <form>
+        <label for="city">City</label>
+        <input id="city" name="address-line1" autocomplete="address-line1" />
+      </form>
+    `);
+    const fields = scanFields(document);
+    expect(fields[0]?.label).toBe("City");
+    expect(fields[0]?.autocomplete).toBe("address-line1");
+  });
+
   it("returns empty-string label when nothing identifies the field", () => {
     setBody(`
       <form>

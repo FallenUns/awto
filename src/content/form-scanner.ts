@@ -239,8 +239,24 @@ function extractLabel(el: Fillable, doc: Document): string {
   if (ariaLabel && ariaLabel.trim()) return ariaLabel.trim();
   const placeholder = el.getAttribute("placeholder");
   if (placeholder && placeholder.trim()) return placeholder.trim();
+  const tableLabel = nearestTableHeaderText(el);
+  if (tableLabel) return tableLabel;
   const sibling = nearestPrecedingText(el);
   if (sibling) return sibling;
+  return "";
+}
+
+function nearestTableHeaderText(el: HTMLElement): string {
+  const cell = el.closest("td, th");
+  const row = cell?.parentElement;
+  if (!cell || !row) return "";
+  const cells = Array.from(row.children);
+  const index = cells.indexOf(cell);
+  for (let i = index - 1; i >= 0; i--) {
+    const candidate = cells[i] as HTMLElement | undefined;
+    const text = candidate?.textContent?.trim();
+    if (text) return text;
+  }
   return "";
 }
 
