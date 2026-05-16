@@ -8,6 +8,8 @@ import {
 } from "@/shared/profile";
 import type { SaveStatus } from "./useOptionsState";
 import { TITLES, PRONOUNS, COUNTRIES } from "./countries";
+import { AddressAutocomplete } from "./AddressAutocomplete";
+import type { AddressResult } from "./geocoder";
 
 const ENUM_FIELDS: Partial<Record<BuiltInKey, readonly string[]>> = {
   title: TITLES,
@@ -209,6 +211,15 @@ export function ProfileTab({
 
   const builtInKeysSet = new Set<string>(BUILT_IN_KEYS);
 
+  function handleAddressSelect(a: AddressResult) {
+    onUpdate("addressLine1", a.addressLine1);
+    if (a.suburb) onUpdate("suburb", a.suburb);
+    if (a.city) onUpdate("city", a.city);
+    if (a.state) onUpdate("state", a.state);
+    if (a.postcode) onUpdate("postcode", a.postcode);
+    if (a.country) onUpdate("country", a.country);
+  }
+
   function handleToggleJson() {
     if (!showJson) {
       setJsonDraft(JSON.stringify(profile, null, 2));
@@ -268,6 +279,24 @@ export function ProfileTab({
             {section.fields.map((field) => {
               const id = `profile-${field.key}`;
               const value = profile[field.key] ?? "";
+              if (field.key === "addressLine1") {
+                return (
+                  <div key={field.key} className="awto-field">
+                    <label className="awto-label" htmlFor={id}>
+                      {field.label}
+                    </label>
+                    <AddressAutocomplete
+                      id={id}
+                      value={value}
+                      onChange={(v) => onUpdate("addressLine1", v)}
+                      onSelect={handleAddressSelect}
+                    />
+                    {field.helper && (
+                      <p className="awto-helper--inline">{field.helper}</p>
+                    )}
+                  </div>
+                );
+              }
               const enumOptions = ENUM_FIELDS[field.key];
               if (enumOptions) {
                 const isCustom =
@@ -347,6 +376,11 @@ export function ProfileTab({
               );
             })}
           </div>
+          {section.id === "address" && (
+            <p className="awto-card__footer-note">
+              Address suggestions powered by OpenStreetMap. Each typed query goes to <code>nominatim.openstreetmap.org</code>. No account, no login.
+            </p>
+          )}
         </section>
       ))}
 
