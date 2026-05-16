@@ -215,33 +215,65 @@ describe("callLocal", () => {
     await expect(callLocal(profile, fields, opts)).rejects.toThrow(/JSON/);
   });
 
-  it(
-    "throws LocalLLMError on timeout",
-    async () => {
-      // Mock fetch to create a promise that rejects when signal is aborted
-      (fetch as unknown as ReturnType<typeof vi.fn>).mockImplementation(
-        (url: string, init?: RequestInit) => {
-          return new Promise((resolve, reject) => {
-            if (init?.signal) {
-              init.signal.addEventListener("abort", () => {
-                const err = new Error("The operation was aborted");
-                (err as any).name = "AbortError";
-                reject(err);
-              });
-            }
-            // If no signal or signal not aborted, never resolve
+  it("rethrows AbortError when external signal aborts (not LocalLLMError)", async () => {
+    const external = new AbortController();
+    const fetchSpy = vi.fn(
+      (_url, init: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init.signal?.addEventListener("abort", () => {
+            const err = new Error("aborted");
+            err.name = "AbortError";
+            reject(err);
           });
+        })
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const promise = callLocal(
+      { firstName: "P", custom: {} },
+      [{ id: 0, selector: "#x", label: "x", placeholder: null, type: "text", required: false }],
+      {
+        ollamaUrl: "http://localhost:11434",
+        ollamaModel: "llama3.2",
+        timeoutMs: 60000,
+        signal: external.signal,
+      }
+    );
+
+    external.abort();
+
+    await expect(promise).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetchSpy).toHaveBeenCalled();
+  });
+
+  it("throws LocalLLMError when timeout signal fires", async () => {
+    const fetchSpy = vi.fn(
+      (_url, init: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init.signal?.addEventListener("abort", () => {
+            const err = new Error("aborted");
+            err.name = "AbortError";
+            reject(err);
+          });
+        })
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await expect(
+      callLocal(
+        { firstName: "P", custom: {} },
+        [{ id: 0, selector: "#x", label: "x", placeholder: null, type: "text", required: false }],
+        {
+          ollamaUrl: "http://localhost:11434",
+          ollamaModel: "llama3.2",
+          timeoutMs: 30,
         }
-      );
-      const optsWithTimeout = { ...opts, timeoutMs: 50 };
-      const error = await callLocal(profile, fields, optsWithTimeout).catch(
-        (e) => e
-      );
-      expect(error).toBeInstanceOf(LocalLLMError);
-      expect(error.message).toContain("timed out after 50ms");
-    },
-    { timeout: 500 }
-  );
+      )
+    ).rejects.toMatchObject({
+      name: "LocalLLMError",
+      message: expect.stringContaining("timed out after 30ms"),
+    });
+  });
 
   it("uses default 30s timeout when timeoutMs is not specified", async () => {
     const f = vi.fn().mockResolvedValue(

@@ -16,6 +16,7 @@ export interface LocalCallOpts {
   ollamaUrl: string;
   ollamaModel: string;
   timeoutMs?: number;
+  signal?: AbortSignal;
 }
 
 function joinUrl(base: string, path: string): string {
@@ -41,22 +42,30 @@ export async function callLocal(
     options: { temperature: 0 },
   };
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const timeoutController = new AbortController();
+  const timer = setTimeout(() => timeoutController.abort(), timeoutMs);
+
+  const composedSignal: AbortSignal = opts.signal
+    ? anySignal([opts.signal, timeoutController.signal])
+    : timeoutController.signal;
+
   let res: Response;
   try {
     res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-      signal: controller.signal,
+      signal: composedSignal,
     });
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
-      throw new LocalLLMError(
-        `Ollama call timed out after ${timeoutMs}ms`,
-        err
-      );
+      if (opts.signal?.aborted) throw err;
+      if (timeoutController.signal.aborted) {
+        throw new LocalLLMError(
+          `Ollama call timed out after ${timeoutMs}ms`,
+          err
+        );
+      }
     }
     throw new LocalLLMError(
       `Failed to reach Ollama at ${opts.ollamaUrl}: ${stringifyError(err)}`,
@@ -170,6 +179,28 @@ export async function listOllamaModels(
 function stringifyError(err: unknown): string {
   if (err instanceof Error) return err.message;
   return String(err);
+}
+
+function anySignal(signals: AbortSignal[]): AbortSignal {
+  const AnyFn = (
+    AbortSignal as unknown as { any?: (signals: AbortSignal[]) => AbortSignal }
+  ).any;
+  if (typeof AnyFn === "function") {
+    return AnyFn.call(AbortSignal, signals);
+  }
+  const controller = new AbortController();
+  for (const s of signals) {
+    if (s.aborted) {
+      controller.abort((s as AbortSignal & { reason?: unknown }).reason);
+      return controller.signal;
+    }
+    s.addEventListener(
+      "abort",
+      () => controller.abort((s as AbortSignal & { reason?: unknown }).reason),
+      { once: true }
+    );
+  }
+  return controller.signal;
 }
 
 function truncate(s: string, max: number): string {
