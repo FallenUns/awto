@@ -27,7 +27,7 @@ describe("startDetector", () => {
     expect(onChange).toHaveBeenCalledWith(2);
   });
 
-  it("re-reports after a mutation that adds inputs (debounced)", async () => {
+  it("re-reports after a mutation that adds personal-data inputs (debounced)", async () => {
     vi.useRealTimers();
     const onChange = vi.fn();
     startDetector(onChange);
@@ -36,13 +36,16 @@ describe("startDetector", () => {
     await new Promise(resolve => setTimeout(resolve, 300));
     expect(onChange).toHaveBeenLastCalledWith(0);
 
-    const input = document.createElement("input");
-    input.name = "x";
-    document.body.appendChild(input);
+    const wrapper = document.createElement("div");
+    wrapper.innerHTML = `
+      <label>Email <input type="email" name="email" /></label>
+      <label>Phone <input type="tel" name="phone" /></label>
+    `;
+    document.body.appendChild(wrapper);
 
     // Wait for debounce
     await new Promise(resolve => setTimeout(resolve, 600));
-    expect(onChange).toHaveBeenLastCalledWith(1);
+    expect(onChange).toHaveBeenLastCalledWith(2);
   });
 
   it("no-ops on chrome-extension:// pages", () => {
@@ -57,5 +60,42 @@ describe("startDetector", () => {
     expect(onChange).not.toHaveBeenCalled();
     stop();
     Object.defineProperty(window, "location", { value: { href: original }, writable: true });
+  });
+
+  it("ignores pages with only a search-style input (no personal signal)", () => {
+    document.body.innerHTML = `
+      <form>
+        <label>Search <input name="q" type="search" /></label>
+        <input type="text" name="filter" />
+      </form>
+    `;
+    const onChange = vi.fn();
+    startDetector(onChange);
+    vi.advanceTimersByTime(300);
+    expect(onChange).toHaveBeenCalledWith(0);
+  });
+
+  it("reports count when at least one personal-data field is present", () => {
+    document.body.innerHTML = `
+      <form>
+        <label>Email <input type="email" name="email" /></label>
+        <label>Comments <textarea></textarea></label>
+      </form>
+    `;
+    const onChange = vi.fn();
+    startDetector(onChange);
+    vi.advanceTimersByTime(300);
+    expect(onChange).toHaveBeenCalledWith(2);
+  });
+
+  it("ignores YouTube-style page: search + one other utility input", () => {
+    document.body.innerHTML = `
+      <input type="search" name="search_query" placeholder="Search" />
+      <input type="text" name="filter" placeholder="Filter results" />
+    `;
+    const onChange = vi.fn();
+    startDetector(onChange);
+    vi.advanceTimersByTime(300);
+    expect(onChange).toHaveBeenCalledWith(0);
   });
 });
