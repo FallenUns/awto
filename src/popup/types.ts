@@ -44,6 +44,7 @@ export interface FlowState {
   status: FlowStatus;
   error: string | null;
   fields: ScannedField[];
+  loadingFields: ScannedField[];
   mappings: FieldMapping[];
   fillRows: FillRow[];
   missingRows: MissingRow[];

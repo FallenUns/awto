@@ -35,6 +35,7 @@ const INITIAL_STATE: FlowState = {
   status: "scanning",
   error: null,
   fields: [],
+  loadingFields: [],
   mappings: [],
   fillRows: [],
   missingRows: [],
@@ -169,6 +170,7 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
           status: "ready",
           error: null,
           fields,
+          loadingFields: [],
           mappings: msg.mappings,
           fillRows,
           missingRows,
@@ -207,6 +209,7 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
           status: "ready",
           error: null,
           fields,
+          loadingFields: [],
           mappings: msg.mappings,
           fillRows,
           missingRows,
@@ -278,7 +281,7 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
           return;
         }
 
-        setState((s) => ({ ...s, status: "mapping", fields }));
+        setState((s) => ({ ...s, status: "mapping", fields, loadingFields: fields }));
         fieldsRef.current = fields;
 
         const profile = await loadProfileFn();
@@ -427,6 +430,7 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
     setState((s) => ({
       ...s,
       status: "mapping",
+      loadingFields: fields,
       fillRows: [],
       missingRows: [],
       skippedRows: [],

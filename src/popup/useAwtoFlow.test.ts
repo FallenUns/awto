@@ -577,6 +577,110 @@ describe("useAwtoFlow", () => {
     expect(mapCalls[1]?.fields).toEqual(fields);
   });
 
+  it("populates loadingFields after scanFormResult before mapping completes", async () => {
+    const portHandle = makePort();
+    const queryActiveTab = vi.fn().mockResolvedValue({ id: 42 });
+    const sendToTab = vi
+      .fn()
+      .mockImplementation(async (_tabId: number, msg: AwtoMessage) => {
+        if (msg.type === "scanForm") {
+          return { type: "scanFormResult", fields } satisfies AwtoMessage;
+        }
+        throw new Error(`unexpected tab message: ${msg.type}`);
+      });
+    const loadProfileMock = vi.fn().mockResolvedValue(baseProfile);
+    const saveProfileMock = vi.fn().mockResolvedValue(undefined);
+    const closePopup = vi.fn();
+
+    const { result } = renderHook(() =>
+      useAwtoFlow({
+        _connect: (() => portHandle.port) as unknown as typeof chrome.runtime.connect,
+        _sendToTab: sendToTab,
+        _queryActiveTab: queryActiveTab,
+        _loadProfile: loadProfileMock,
+        _saveProfile: saveProfileMock,
+        _closePopup: closePopup,
+      })
+    );
+
+    await waitFor(() => {
+      expect(
+        portHandle.posted.some((m) => m.type === "mapFields")
+      ).toBe(true);
+    });
+
+    expect(result.current.state.loadingFields).toEqual(fields);
+    expect(result.current.status).toBe("mapping");
+  });
+
+  it("clears loadingFields when mapFieldsResult completes", async () => {
+    const deps = makeDeps();
+    const { result } = renderFlow(deps);
+
+    await waitFor(() => {
+      expect(result.current.status).toBe("ready");
+    });
+
+    expect(result.current.state.loadingFields).toEqual([]);
+  });
+
+  it("repopulates loadingFields on rescan until mapping completes", async () => {
+    const portHandle = makePort();
+    const queryActiveTab = vi.fn().mockResolvedValue({ id: 42 });
+    const sendToTab = vi
+      .fn()
+      .mockImplementation(async (_tabId: number, msg: AwtoMessage) => {
+        if (msg.type === "scanForm") {
+          return { type: "scanFormResult", fields } satisfies AwtoMessage;
+        }
+        throw new Error(`unexpected tab message: ${msg.type}`);
+      });
+    const loadProfileMock = vi.fn().mockResolvedValue(baseProfile);
+    const saveProfileMock = vi.fn().mockResolvedValue(undefined);
+    const closePopup = vi.fn();
+
+    const { result } = renderHook(() =>
+      useAwtoFlow({
+        _connect: (() => portHandle.port) as unknown as typeof chrome.runtime.connect,
+        _sendToTab: sendToTab,
+        _queryActiveTab: queryActiveTab,
+        _loadProfile: loadProfileMock,
+        _saveProfile: saveProfileMock,
+        _closePopup: closePopup,
+      })
+    );
+
+    await waitFor(() => {
+      expect(result.current.status).toBe("mapping");
+      expect(result.current.state.loadingFields).toEqual(fields);
+    });
+
+    // Reply with mapFieldsResult to transition to ready
+    await act(async () => {
+      portHandle.autoReply({
+        type: "mapFieldsResult",
+        mappings,
+        source: "local",
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.status).toBe("ready");
+    });
+
+    expect(result.current.state.loadingFields).toEqual([]);
+
+    // Trigger rescan
+    await act(async () => {
+      result.current.rescan();
+      await Promise.resolve();
+    });
+
+    // loadingFields should be repopulated after rescan
+    expect(result.current.state.loadingFields).toEqual(fields);
+    expect(result.current.status).toBe("mapping");
+  });
+
   it("disconnects the port on unmount", async () => {
     let disconnected = false;
     const port = {
