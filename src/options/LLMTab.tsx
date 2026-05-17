@@ -167,12 +167,11 @@ export function LLMTab({
           )}
           {showCustomInput && installedModels !== null && (
             <input
-              className="awto-input"
+              className="awto-input awto-input--custom"
               type="text"
               value={settings.ollamaModel}
               onChange={(e) => onUpdate({ ollamaModel: e.target.value })}
               placeholder="llama3.2"
-              style={{ marginTop: 8 }}
               aria-label="Custom model name"
             />
           )}
@@ -208,14 +207,7 @@ export function LLMTab({
           </p>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            flexWrap: "wrap",
-          }}
-        >
+        <div className="awto-action-row">
           <button
             type="button"
             className="awto-btn awto-btn--secondary"

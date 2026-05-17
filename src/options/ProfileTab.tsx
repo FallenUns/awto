@@ -64,7 +64,7 @@ const SECTIONS: SectionDef[] = [
         label: "Date of birth",
         type: "date",
         autocomplete: "bday",
-        helper: "YYYY-MM-DD",
+        helper: "Stored as YYYY-MM-DD",
       },
     ],
   },
@@ -337,11 +337,10 @@ export function ProfileTab({
                     {isCustom && (
                       <input
                         type="text"
-                        className="awto-input"
+                        className="awto-input awto-input--custom"
                         aria-label={`Custom ${field.label}`}
                         value={value.trim() === "" ? "" : value}
                         onChange={(e) => onUpdate(field.key, e.target.value)}
-                        style={{ marginTop: 8 }}
                       />
                     )}
                     {field.helper && (
@@ -411,7 +410,7 @@ export function ProfileTab({
           </p>
         )}
         {customEntries.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div className="awto-custom-list">
             {customEntries.map(([key, value]) => {
               const id = `custom-${key}`;
               return (
