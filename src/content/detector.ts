@@ -5,33 +5,100 @@ const INITIAL_DELAY_MS = 250;
 const MUTATION_DEBOUNCE_MS = 500;
 const SKIP_PROTOCOLS = ["chrome:", "chrome-extension:", "about:", "view-source:"];
 
-const PERSONAL_KEYWORDS = [
-  "first name", "last name", "given name", "family name", "surname",
-  "full name", "middle name", "preferred name", "nickname", "title",
-  "email", "e-mail", "phone", "telephone", "mobile", "cell", "tel",
-  "address", "street", "city", "suburb", "town", "state", "province",
-  "postcode", "zip", "postal", "country",
-  "birth", "dob", "date of birth", "age", "gender", "pronoun",
-  "nationality", "citizen", "visa", "work right",
-  "employer", "company", "occupation", "job title", "linkedin",
-  "github", "website", "portfolio",
-  "tax file", "tfn", "medicare", "driver license", "driver licence",
-  "passport", "license number",
-  "subscribe", "sign up", "signup", "register", "newsletter",
-];
+type Category = "name" | "address" | "contact" | "personal" | "legal" | "work" | "web";
+
+const STRONG_CATEGORIES = new Set<Category>(["name", "address"]);
+
+const CATEGORY_KEYWORDS: Record<Category, string[]> = {
+  name: [
+    "first name", "last name", "given name", "family name", "surname",
+    "full name", "middle name", "preferred name", "nickname", "title",
+  ],
+  contact: [
+    "email", "e-mail", "phone", "telephone", "mobile", "cell phone", " tel ",
+  ],
+  address: [
+    "street", "city", "town", "state ", "province", "country",
+    "address line", "street address", "address1", "address 1",
+    "suburb", "postcode", "zip code", "postal code",
+  ],
+  personal: [
+    "date of birth", "birth date", "dob", "birthday", "age", "gender", "pronoun",
+  ],
+  legal: [
+    "nationality", "citizen", "visa", "work right",
+    "tax file", "tfn", "medicare", "driver license", "driver licence",
+    "passport", "license number",
+  ],
+  work: [
+    "employer", "occupation", "job title", "linkedin",
+  ],
+  web: [
+    "github", "portfolio",
+  ],
+};
 
 const SEARCH_KEYWORDS = [
   "search", "query", "find ", " find", "lookup", "filter",
+  "go to file", "jump to",
 ];
 
-function looksPersonal(field: ScannedField): boolean {
-  const haystack = [field.label, field.placeholder ?? ""]
-    .join(" ")
-    .toLowerCase();
+const TEXT_LIKE_TYPES = new Set([
+  "text", "email", "tel", "number", "url", "textarea", "select",
+]);
 
-  if (SEARCH_KEYWORDS.some((k) => haystack.includes(k))) return false;
+const EXCLUDED_CONTAINER_TAGS = ["NAV", "HEADER", "FOOTER", "ASIDE"];
 
-  return PERSONAL_KEYWORDS.some((k) => haystack.includes(k));
+function isTextLike(type: string): boolean {
+  return TEXT_LIKE_TYPES.has(type.toLowerCase());
+}
+
+function isInExcludedContainer(selector: string): boolean {
+  try {
+    const el = document.querySelector(selector);
+    if (!el) return false;
+    let cur: Element | null = el.parentElement;
+    while (cur) {
+      if (EXCLUDED_CONTAINER_TAGS.includes(cur.tagName)) return true;
+      cur = cur.parentElement;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function categoryFor(field: ScannedField): Category | null {
+  const haystack = ` ${field.label.toLowerCase()} ${(field.placeholder ?? "").toLowerCase()} `;
+  if (SEARCH_KEYWORDS.some((k) => haystack.includes(k))) return null;
+  for (const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS) as [Category, string[]][]) {
+    if (keywords.some((k) => haystack.includes(k))) return cat;
+  }
+  return null;
+}
+
+function evaluateFields(fields: ScannedField[]): number {
+  const personalFields = fields.filter((f) => isTextLike(f.type));
+  const categories = new Set<Category>();
+  let personalCount = 0;
+  for (const field of personalFields) {
+    if (isInExcludedContainer(field.selector)) continue;
+    const cat = categoryFor(field);
+    if (cat) {
+      categories.add(cat);
+      personalCount += 1;
+    }
+  }
+
+  if (personalCount < 2) return 0;
+
+  const hasStrong = Array.from(categories).some((c) => STRONG_CATEGORIES.has(c));
+  if (hasStrong) {
+    if (categories.size >= 2 || personalCount >= 3) return fields.length;
+    return 0;
+  }
+  if (categories.size >= 3) return fields.length;
+  return 0;
 }
 
 export function startDetector(onChange: (count: number) => void): () => void {
@@ -47,8 +114,7 @@ export function startDetector(onChange: (count: number) => void): () => void {
   const evaluate = () => {
     try {
       const fields = scanFields(document);
-      const personalCount = fields.filter(looksPersonal).length;
-      const count = personalCount >= 1 && fields.length >= 2 ? fields.length : 0;
+      const count = evaluateFields(fields);
       if (count !== lastCount) {
         lastCount = count;
         onChange(count);

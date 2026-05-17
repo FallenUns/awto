@@ -17,7 +17,7 @@ describe("startDetector", () => {
   it("reports field count on a page with inputs", () => {
     document.body.innerHTML = `
       <form>
-        <label>Name <input name="name" /></label>
+        <label>First name <input name="firstname" /></label>
         <label>Email <input type="email" name="email" /></label>
       </form>
     `;
@@ -38,8 +38,8 @@ describe("startDetector", () => {
 
     const wrapper = document.createElement("div");
     wrapper.innerHTML = `
+      <label>Full name <input type="text" name="fullname" /></label>
       <label>Email <input type="email" name="email" /></label>
-      <label>Phone <input type="tel" name="phone" /></label>
     `;
     document.body.appendChild(wrapper);
 
@@ -75,11 +75,11 @@ describe("startDetector", () => {
     expect(onChange).toHaveBeenCalledWith(0);
   });
 
-  it("reports count when at least one personal-data field is present", () => {
+  it("reports count when a name+email pair is present (strong + contact category)", () => {
     document.body.innerHTML = `
       <form>
+        <label>Full name <input type="text" name="fullname" /></label>
         <label>Email <input type="email" name="email" /></label>
-        <label>Comments <textarea></textarea></label>
       </form>
     `;
     const onChange = vi.fn();
@@ -92,6 +92,90 @@ describe("startDetector", () => {
     document.body.innerHTML = `
       <input type="search" name="search_query" placeholder="Search" />
       <input type="text" name="filter" placeholder="Filter results" />
+    `;
+    const onChange = vi.fn();
+    startDetector(onChange);
+    vi.advanceTimersByTime(300);
+    expect(onChange).toHaveBeenCalledWith(0);
+  });
+
+  it("ignores a GitHub-style repo page: Description + Topics + Website + email-notification toggle", () => {
+    document.body.innerHTML = `
+      <header><input type="search" placeholder="Search or jump to..." /></header>
+      <main>
+        <input type="text" placeholder="Go to file" />
+        <textarea placeholder="Description"></textarea>
+        <input type="text" placeholder="Website" value="https://example.com" />
+        <input type="text" placeholder="Topics (separate with spaces)" />
+        <label><input type="checkbox" name="notify_email" /> Include my email address so I can be contacted</label>
+      </main>
+    `;
+    const onChange = vi.fn();
+    startDetector(onChange);
+    vi.advanceTimersByTime(300);
+    expect(onChange).toHaveBeenCalledWith(0);
+  });
+
+  it("ignores a page with only an email subscribe field", () => {
+    document.body.innerHTML = `
+      <form>
+        <label>Email <input type="email" name="email" /></label>
+        <button type="submit">Subscribe</button>
+      </form>
+    `;
+    const onChange = vi.fn();
+    startDetector(onChange);
+    vi.advanceTimersByTime(300);
+    expect(onChange).toHaveBeenCalledWith(0);
+  });
+
+  it("ignores personal-looking fields inside <nav>, <header>, <footer>, <aside>", () => {
+    document.body.innerHTML = `
+      <nav>
+        <input type="text" placeholder="Email me about updates" />
+        <input type="text" placeholder="Your name" />
+      </nav>
+    `;
+    const onChange = vi.fn();
+    startDetector(onChange);
+    vi.advanceTimersByTime(300);
+    expect(onChange).toHaveBeenCalledWith(0);
+  });
+
+  it("triggers on a real signup form: name + email + password", () => {
+    document.body.innerHTML = `
+      <form>
+        <label>Full name <input type="text" name="fullname" /></label>
+        <label>Email <input type="email" name="email" /></label>
+        <label>Password <input type="password" name="pw" /></label>
+      </form>
+    `;
+    const onChange = vi.fn();
+    startDetector(onChange);
+    vi.advanceTimersByTime(300);
+    expect(onChange).toHaveBeenCalledWith(3);
+  });
+
+  it("triggers on an address-only form (address category x 3 = strong signal)", () => {
+    document.body.innerHTML = `
+      <form>
+        <label>Street <input type="text" name="street" /></label>
+        <label>City <input type="text" name="city" /></label>
+        <label>Postcode <input type="text" name="postcode" /></label>
+      </form>
+    `;
+    const onChange = vi.fn();
+    startDetector(onChange);
+    vi.advanceTimersByTime(300);
+    expect(onChange).toHaveBeenCalledWith(3);
+  });
+
+  it("ignores a single Website-only field on an otherwise unrelated page (too weak)", () => {
+    document.body.innerHTML = `
+      <main>
+        <input type="text" placeholder="Website" />
+        <textarea placeholder="Description"></textarea>
+      </main>
     `;
     const onChange = vi.fn();
     startDetector(onChange);
