@@ -31,6 +31,28 @@ function errorToMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+export function dedupeFillsByProfileKey(
+  mappings: FieldMapping[]
+): FieldMapping[] {
+  const claimed = new Set<string>();
+  return mappings.map((m) => {
+    if (m.actionType !== "fill" || !m.profileKey) return m;
+    if (!claimed.has(m.profileKey)) {
+      claimed.add(m.profileKey);
+      return m;
+    }
+    return {
+      fieldId: m.fieldId,
+      actionType: "missing",
+      profileKey: null,
+      suggestedKey: m.profileKey,
+      promptText: `Same as another field — type a different value if you have one`,
+      reason: null,
+      confidence: 1,
+    };
+  });
+}
+
 export async function handleMessage(
   message: AwtoMessage,
   deps: HandleMessageDeps = {}
@@ -116,11 +138,11 @@ export async function handleMessage(
         return { type: "mapFieldsError", error: errorMessage };
       }
 
-      const allMappings: FieldMapping[] = [
-        ...ruleMappings,
-        ...preSkipped,
-        ...llmMappings,
-      ].sort((a, b) => a.fieldId - b.fieldId);
+      const allMappings: FieldMapping[] = dedupeFillsByProfileKey(
+        [...ruleMappings, ...preSkipped, ...llmMappings].sort(
+          (a, b) => a.fieldId - b.fieldId
+        )
+      );
 
       const source: "local" | "cloud" | "mixed" =
         sources.size > 1

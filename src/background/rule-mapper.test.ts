@@ -401,6 +401,53 @@ describe("ruleMap", () => {
     });
   });
 
+  describe("claim-aware fills — one profile key per form", () => {
+    it("fills only the first phone field when profile has just one phone", () => {
+      const profile: Profile = { phone: "0421806625", custom: {} };
+      const fields: ScannedField[] = [
+        labelledField(0, "Home Phone"),
+        labelledField(1, "Work Telephone"),
+        labelledField(2, "Cell Phone"),
+      ];
+      const { ruleMappings } = ruleMap(fields, profile);
+      const fills = ruleMappings.filter((m) => m.actionType === "fill");
+      expect(fills).toHaveLength(1);
+      expect(fills[0]?.fieldId).toBe(0);
+      expect(ruleMappings[1]).toMatchObject({ actionType: "missing" });
+      expect(ruleMappings[2]).toMatchObject({ actionType: "missing" });
+    });
+
+    it("fills two phone fields when profile has both phone and mobilePhone", () => {
+      const profile: Profile = {
+        phone: "0400 000 000",
+        mobilePhone: "0411 111 111",
+        custom: {},
+      };
+      const fields: ScannedField[] = [
+        labelledField(0, "Home Phone"),
+        labelledField(1, "Work Telephone"),
+        labelledField(2, "Cell Phone"),
+      ];
+      const { ruleMappings } = ruleMap(fields, profile);
+      const fills = ruleMappings.filter((m) => m.actionType === "fill");
+      expect(fills).toHaveLength(2);
+      const keys = fills.map((m) => m.profileKey).sort();
+      expect(keys).toEqual(["mobilePhone", "phone"]);
+    });
+
+    it("does not duplicate a single-key fill (e.g. firstName across two fields)", () => {
+      const profile: Profile = { firstName: "Patrick", custom: {} };
+      const fields: ScannedField[] = [
+        labelledField(0, "First name"),
+        labelledField(1, "Given name"),
+      ];
+      const { ruleMappings } = ruleMap(fields, profile);
+      const fills = ruleMappings.filter((m) => m.actionType === "fill");
+      expect(fills).toHaveLength(1);
+      expect(ruleMappings[1]).toMatchObject({ actionType: "missing" });
+    });
+  });
+
   describe("radio option-match guard", () => {
     it("falls through to LLM when profile value doesn't match any radio option", () => {
       const profile: Profile = { gender: "Male", custom: {} };

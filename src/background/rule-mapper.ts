@@ -176,6 +176,7 @@ export function ruleMap(
 ): RuleMapResult {
   const ruleMappings: FieldMapping[] = [];
   const remaining: ScannedField[] = [];
+  const claimed = new Set<string>();
   const hasSeparateUnitOrAddressLine2 = fields.some((field) =>
     /\b(address|street)?\s*line\s*2\b|\bapt\b|\bapartment\b|\bunit\b|\bsuite\b/.test(
       fieldSignal(field)
@@ -188,7 +189,7 @@ export function ruleMap(
       continue;
     }
 
-    const labelResult = resultFromLabel(field, profile);
+    const labelResult = resultFromLabel(field, profile, claimed);
     const autocompleteKey = keyFromAutocomplete(field.autocomplete);
     const keyOrNull =
       labelResult?.type === "key" ? labelResult.key : autocompleteKey;
@@ -219,6 +220,12 @@ export function ruleMap(
       keyOrNull === "addressLine1WithUnit" && hasSeparateUnitOrAddressLine2
         ? "addressLine1"
         : keyOrNull;
+
+    if (claimed.has(key)) {
+      ruleMappings.push(makeMissing(field.id, key, field.label));
+      continue;
+    }
+
     const value = resolveValue(profile, key);
     if (value !== undefined && value !== "") {
       if (
@@ -230,6 +237,7 @@ export function ruleMap(
         remaining.push(field);
         continue;
       }
+      claimed.add(key);
       ruleMappings.push(makeFill(field.id, key));
     } else {
       ruleMappings.push(makeMissing(field.id, key, field.label));
@@ -251,7 +259,8 @@ type LabelResult =
 
 function resultFromLabel(
   field: ScannedField,
-  profile: Profile
+  profile: Profile,
+  claimed: Set<string>
 ): LabelResult | undefined {
   const signal = fieldSignal(field);
   if (!signal) return undefined;
@@ -279,7 +288,7 @@ function resultFromLabel(
     }
     if (!rule.key) return undefined;
     const keys = Array.isArray(rule.key) ? rule.key : [rule.key];
-    const key = pickBestAvailableKey(profile, keys);
+    const key = pickBestAvailableKey(profile, keys, claimed);
     return { type: "key", key };
   }
 
@@ -347,11 +356,22 @@ const MONTH_OPTION_WORDS = new Set([
   "december",
 ]);
 
-function pickBestAvailableKey(profile: Profile, keys: string[]): string {
-  return keys.find((key) => {
+function pickBestAvailableKey(
+  profile: Profile,
+  keys: string[],
+  claimed: Set<string>
+): string {
+  const unclaimedWithValue = keys.find((key) => {
+    if (claimed.has(key)) return false;
     const value = resolveValue(profile, key);
     return value !== undefined && value !== "";
-  }) ?? keys[0]!;
+  });
+  if (unclaimedWithValue) return unclaimedWithValue;
+  const anyWithValue = keys.find((key) => {
+    const value = resolveValue(profile, key);
+    return value !== undefined && value !== "";
+  });
+  return anyWithValue ?? keys[0]!;
 }
 
 function fieldSignal(field: ScannedField): string {

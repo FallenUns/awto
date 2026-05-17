@@ -11,7 +11,9 @@ import { _clearCache, setCached, cacheKey, getCached } from "./result-cache";
   },
 };
 
-const { handleMessage, registerPortHandler } = await import("./service-worker");
+const { handleMessage, registerPortHandler, dedupeFillsByProfileKey } = await import(
+  "./service-worker"
+);
 
 const profile: Profile = { firstName: "Patrick", custom: { favouriteColour: "red" } };
 const fields: ScannedField[] = [
@@ -691,4 +693,68 @@ it("returns openPopupResult ok=false when chrome.action.openPopup rejects", asyn
 
   const reply = await handleMessage({ type: "openPopup" });
   expect(reply).toEqual({ type: "openPopupResult", ok: false, error: "no active tab" });
+});
+
+describe("dedupeFillsByProfileKey", () => {
+  const baseFill = (fieldId: number, profileKey: string) => ({
+    fieldId,
+    actionType: "fill" as const,
+    profileKey,
+    suggestedKey: null,
+    promptText: null,
+    reason: null,
+    confidence: 1,
+  });
+
+  it("keeps the first fill for a given profile key and downgrades later duplicates to missing", () => {
+    const result = dedupeFillsByProfileKey([
+      baseFill(0, "phone"),
+      baseFill(1, "phone"),
+      baseFill(2, "phone"),
+    ]);
+    expect(result[0]).toMatchObject({ actionType: "fill", fieldId: 0 });
+    expect(result[1]).toMatchObject({
+      actionType: "missing",
+      fieldId: 1,
+      suggestedKey: "phone",
+    });
+    expect(result[2]).toMatchObject({
+      actionType: "missing",
+      fieldId: 2,
+      suggestedKey: "phone",
+    });
+  });
+
+  it("passes through fills with distinct profile keys", () => {
+    const result = dedupeFillsByProfileKey([
+      baseFill(0, "phone"),
+      baseFill(1, "mobilePhone"),
+      baseFill(2, "email"),
+    ]);
+    expect(result.every((m) => m.actionType === "fill")).toBe(true);
+  });
+
+  it("leaves missing/skip rows alone", () => {
+    const input = [
+      {
+        fieldId: 0,
+        actionType: "missing" as const,
+        profileKey: null,
+        suggestedKey: "userId",
+        promptText: "What's your user ID?",
+        reason: null,
+        confidence: 1,
+      },
+      {
+        fieldId: 1,
+        actionType: "skip" as const,
+        profileKey: null,
+        suggestedKey: null,
+        promptText: null,
+        reason: "Sensitive credential — fill manually",
+        confidence: 1,
+      },
+    ];
+    expect(dedupeFillsByProfileKey(input)).toEqual(input);
+  });
 });
