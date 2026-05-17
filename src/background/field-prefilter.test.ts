@@ -33,48 +33,28 @@ describe("prefilter", () => {
     expect(result.skipped).toEqual([]);
   });
 
-  it("always skips radios", () => {
+  it("forwards radios — no longer hard-skipped at this layer", () => {
     const fields = [text(0, "Name"), radio(1, "Size")];
     const result = prefilter(fields, baseProfile);
-    expect(result.toLLM).toEqual([fields[0]]);
-    expect(result.skipped).toHaveLength(1);
-    expect(result.skipped[0]).toMatchObject({
-      fieldId: 1,
-      actionType: "skip",
-      reason: expect.stringContaining("manual"),
-    });
-  });
-
-  it("skips checkboxes when no consent-like profile keys exist", () => {
-    const fields = [text(0, "Name"), checkbox(1, "Bacon"), checkbox(2, "Extra Cheese")];
-    const result = prefilter(fields, baseProfile);
-    expect(result.toLLM).toEqual([fields[0]]);
-    expect(result.skipped).toHaveLength(2);
-    expect(result.skipped.every((m) => m.actionType === "skip")).toBe(true);
-  });
-
-  it("forwards checkboxes when profile has a matching consent-like key", () => {
-    const fields = [text(0, "Name"), checkbox(1, "I agree to the terms")];
-    const profile: Profile = {
-      ...baseProfile,
-      custom: { agreeToTerms: "true" },
-    };
-    const result = prefilter(fields, profile);
     expect(result.toLLM).toEqual(fields);
     expect(result.skipped).toEqual([]);
   });
 
-  it("synthetic skip mappings have valid shape (FieldMapping)", () => {
-    const fields = [radio(0, "Size")];
+  it("forwards checkboxes — no longer hard-skipped at this layer", () => {
+    const fields = [
+      text(0, "Name"),
+      checkbox(1, "Bacon"),
+      checkbox(2, "Extra Cheese"),
+    ];
     const result = prefilter(fields, baseProfile);
-    expect(result.skipped[0]).toEqual({
-      fieldId: 0,
-      actionType: "skip",
-      profileKey: null,
-      suggestedKey: null,
-      promptText: null,
-      reason: expect.any(String),
-      confidence: 1,
-    });
+    expect(result.toLLM).toEqual(fields);
+    expect(result.skipped).toEqual([]);
+  });
+
+  it("returns a new array (doesn't mutate input)", () => {
+    const fields = [text(0, "Name")];
+    const result = prefilter(fields, baseProfile);
+    expect(result.toLLM).not.toBe(fields);
+    expect(result.toLLM).toEqual(fields);
   });
 });

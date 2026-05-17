@@ -135,16 +135,39 @@ function makeMissing(
   label: string,
   promptText?: string
 ): FieldMapping {
-  const friendly = label || key;
   return {
     fieldId,
     actionType: "missing",
     profileKey: null,
     suggestedKey: key,
-    promptText: promptText ?? `What's your ${friendly}?`,
+    promptText: promptText ?? phrasePrompt(label, key),
     reason: null,
     confidence: 1,
   };
+}
+
+export function phrasePrompt(label: string, fallbackKey: string): string {
+  const trimmed = label.trim();
+  if (!trimmed) return `What's your ${fallbackKey}?`;
+  if (trimmed.endsWith("?")) return trimmed;
+  if (looksLikeQuestion(trimmed)) {
+    const withoutTrailingPunct = trimmed.replace(/[.:!]+$/, "");
+    return `${withoutTrailingPunct}?`;
+  }
+  const stripped = trimmed.replace(/[:.!]+$/, "");
+  return `What's your ${stripped}?`;
+}
+
+function looksLikeQuestion(text: string): boolean {
+  return /^(what|where|when|why|how|who|which|to\s+what|is|are|do|does|did|can|could|should|would|will|tell|describe)\b/i.test(
+    text
+  );
+}
+
+function matchesAnyOption(value: string, options: string[]): boolean {
+  const v = value.trim().toLowerCase();
+  if (!v) return false;
+  return options.some((o) => o.trim().toLowerCase() === v);
 }
 
 export function ruleMap(
@@ -198,6 +221,15 @@ export function ruleMap(
         : keyOrNull;
     const value = resolveValue(profile, key);
     if (value !== undefined && value !== "") {
+      if (
+        field.type === "radio" &&
+        field.options &&
+        field.options.length > 0 &&
+        !matchesAnyOption(value, field.options)
+      ) {
+        remaining.push(field);
+        continue;
+      }
       ruleMappings.push(makeFill(field.id, key));
     } else {
       ruleMappings.push(makeMissing(field.id, key, field.label));
@@ -259,9 +291,19 @@ function dateOfBirthPartKey(
   signal: string
 ): "dateOfBirthMonth" | "dateOfBirthDay" | "dateOfBirthYear" | null {
   if (field.type !== "select") return null;
-  if (!/\b(date\s*of\s*birth|birth\s*date|dob|month|day|year)\b/.test(signal)) {
+  const hint = normalizeSignal(selectorHint(field.selector));
+  const combined = `${signal} ${hint}`.trim();
+  if (
+    !/\b(date\s*of\s*birth|birth\s*date|birthday|dob|month|day|year)\b/.test(
+      combined
+    )
+  ) {
     return null;
   }
+
+  if (/\bmonth\b/.test(hint)) return "dateOfBirthMonth";
+  if (/\bday\b/.test(hint)) return "dateOfBirthDay";
+  if (/\byear\b/.test(hint)) return "dateOfBirthYear";
 
   const options = (field.options ?? []).map(normalizeSignal).filter(Boolean);
   if (/^month$/.test(signal) || options.some((o) => MONTH_OPTION_WORDS.has(o))) {

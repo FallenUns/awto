@@ -465,4 +465,73 @@ describe("scanFields", () => {
     const fields = scanFields(document);
     expect(fields[0]?.autocomplete).toBe("given-name");
   });
+
+  describe("rich-text editor auxiliary inputs", () => {
+    it("skips inputs inside CKEditor wrappers", () => {
+      setBody(`
+        <form>
+          <input id="email" type="email" />
+          <div class="cke_editable">
+            <input class="cke_clipboard" />
+            <textarea class="cke_textarea_inline"></textarea>
+          </div>
+        </form>
+      `);
+      const fields = scanFields(document);
+      expect(fields.map((f) => f.selector)).toEqual(["#email"]);
+    });
+
+    it("skips inputs inside Quill containers", () => {
+      setBody(`
+        <form>
+          <input id="email" type="email" />
+          <div class="ql-container">
+            <textarea class="ql-clipboard"></textarea>
+          </div>
+        </form>
+      `);
+      const fields = scanFields(document);
+      expect(fields.map((f) => f.selector)).toEqual(["#email"]);
+    });
+
+    it("skips Summernote, TinyMCE, and Trumbowyg auxiliary inputs", () => {
+      setBody(`
+        <form>
+          <input id="email" type="email" />
+          <div class="note-editor"><textarea class="note-codable"></textarea></div>
+          <div class="tox-tinymce"><input class="tox-some-input" /></div>
+          <div class="trumbowyg-box"><textarea class="trumbowyg-textarea"></textarea></div>
+        </form>
+      `);
+      const fields = scanFields(document);
+      expect(fields.map((f) => f.selector)).toEqual(["#email"]);
+    });
+
+    it("skips inputs inside contenteditable=true wrappers", () => {
+      setBody(`
+        <form>
+          <input id="email" type="email" />
+          <div contenteditable="true">
+            <textarea name="rte-clipboard"></textarea>
+          </div>
+        </form>
+      `);
+      const fields = scanFields(document);
+      expect(fields.map((f) => f.selector)).toEqual(["#email"]);
+    });
+
+    it("skips inputs whose own class starts with cke_/ql-/mce_/tox-/etc", () => {
+      setBody(`
+        <form>
+          <input id="email" type="email" />
+          <input class="cke_input" />
+          <input class="ql-something" />
+          <input class="mce_thing" />
+          <input class="tox-edit" />
+        </form>
+      `);
+      const fields = scanFields(document);
+      expect(fields.map((f) => f.selector)).toEqual(["#email"]);
+    });
+  });
 });

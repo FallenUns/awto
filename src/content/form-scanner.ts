@@ -108,8 +108,53 @@ function isEligible(el: Fillable): boolean {
     if (EXCLUDED_TYPES.has(t)) return false;
   }
   if (el instanceof HTMLButtonElement) return false;
+  if (isInsideRichTextEditor(el)) return false;
   if (isHidden(el)) return false;
   return true;
+}
+
+const RTE_ANCESTOR_SELECTOR = [
+  ".ck-editor",
+  ".cke_editable",
+  ".cke_wysiwyg_div",
+  ".ql-container",
+  ".ql-editor",
+  ".note-editor",
+  ".note-editable",
+  ".tox-tinymce",
+  ".tox-edit-area",
+  ".fr-wrapper",
+  ".fr-box",
+  ".fr-element",
+  ".trumbowyg-box",
+  ".trumbowyg-editor",
+  ".summernote",
+  ".mce-edit-area",
+  ".mce-tinymce",
+  ".cm-editor",
+  '[contenteditable="true"]',
+].join(",");
+
+const RTE_OWN_PREFIXES = [
+  "cke_",
+  "ql-",
+  "mce_",
+  "tox-",
+  "summernote-",
+  "trumbowyg-",
+  "fr-",
+];
+
+function isInsideRichTextEditor(el: HTMLElement): boolean {
+  if (el.closest(RTE_ANCESTOR_SELECTOR)) return true;
+  const classAttr = el.getAttribute("class") ?? "";
+  const classes = classAttr.split(/\s+/).filter(Boolean);
+  if (classes.some((c) => RTE_OWN_PREFIXES.some((p) => c.startsWith(p)))) {
+    return true;
+  }
+  const id = el.id ?? "";
+  if (id && RTE_OWN_PREFIXES.some((p) => id.startsWith(p))) return true;
+  return false;
 }
 
 function isHidden(el: HTMLElement): boolean {

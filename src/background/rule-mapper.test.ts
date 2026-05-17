@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ruleMap } from "./rule-mapper";
+import { ruleMap, phrasePrompt } from "./rule-mapper";
 import type { Profile } from "@/shared/profile";
 import type { ScannedField } from "@/shared/messages";
 
@@ -352,6 +352,124 @@ describe("ruleMap", () => {
     expect(ruleMappings.find((m) => m.fieldId === 35)).toMatchObject({
       actionType: "fill",
       profileKey: "age",
+    });
+  });
+
+  describe("split DOB group with shared 'Birthday' label", () => {
+    const profile: Profile = { dateOfBirth: "1990-04-15", custom: {} };
+
+    function dobGroup(): ScannedField[] {
+      return [
+        {
+          id: 0,
+          selector: "#bd-month",
+          label: "Birthday",
+          placeholder: null,
+          type: "select",
+          required: false,
+          options: ["Month", "January", "February", "March", "April"],
+        },
+        {
+          id: 1,
+          selector: '[name="day"]',
+          label: "Birthday",
+          placeholder: null,
+          type: "select",
+          required: false,
+          options: ["Day", "01", "02", "03", "04", "15"],
+        },
+        {
+          id: 2,
+          selector: '[name="year"]',
+          label: "Birthday",
+          placeholder: null,
+          type: "select",
+          required: false,
+          options: ["Year", "1989", "1990", "1991"],
+        },
+      ];
+    }
+
+    it("classifies each select to its DOB part using selector hint when label is generic", () => {
+      const { ruleMappings, remaining } = ruleMap(dobGroup(), profile);
+      expect(remaining).toEqual([]);
+      expect(ruleMappings.map((m) => m.profileKey)).toEqual([
+        "dateOfBirthMonth",
+        "dateOfBirthDay",
+        "dateOfBirthYear",
+      ]);
+    });
+  });
+
+  describe("radio option-match guard", () => {
+    it("falls through to LLM when profile value doesn't match any radio option", () => {
+      const profile: Profile = { gender: "Male", custom: {} };
+      const fields: ScannedField[] = [
+        {
+          id: 0,
+          selector: '[name="g"]',
+          label: "Gender",
+          placeholder: null,
+          type: "radio",
+          required: false,
+          options: ["Female", "Other"],
+        },
+      ];
+      const { ruleMappings, remaining } = ruleMap(fields, profile);
+      expect(ruleMappings).toHaveLength(0);
+      expect(remaining).toHaveLength(1);
+    });
+
+    it("fills when profile value matches one of the radio options", () => {
+      const profile: Profile = { gender: "Female", custom: {} };
+      const fields: ScannedField[] = [
+        {
+          id: 0,
+          selector: '[name="g"]',
+          label: "Gender",
+          placeholder: null,
+          type: "radio",
+          required: false,
+          options: ["Male", "Female", "Other"],
+        },
+      ];
+      const { ruleMappings } = ruleMap(fields, profile);
+      expect(ruleMappings[0]).toMatchObject({
+        actionType: "fill",
+        profileKey: "gender",
+      });
+    });
+  });
+
+  describe("phrasePrompt — friendly missing prompts", () => {
+    it("returns label verbatim when it already ends with ?", () => {
+      expect(phrasePrompt("What's your name?", "x")).toBe("What's your name?");
+      expect(phrasePrompt("To what URL should this link go?", "x")).toBe(
+        "To what URL should this link go?"
+      );
+    });
+
+    it("appends ? when label starts with a wh-word or verb-of-asking", () => {
+      expect(phrasePrompt("Tell us about yourself", "x")).toBe(
+        "Tell us about yourself?"
+      );
+      expect(phrasePrompt("Describe your role", "x")).toBe("Describe your role?");
+      expect(phrasePrompt("How long have you worked here", "x")).toBe(
+        "How long have you worked here?"
+      );
+    });
+
+    it("uses 'What's your X?' template for noun-form labels", () => {
+      expect(phrasePrompt("Email", "email")).toBe("What's your Email?");
+      expect(phrasePrompt("Email:", "email")).toBe("What's your Email?");
+      expect(phrasePrompt("First name.", "firstName")).toBe(
+        "What's your First name?"
+      );
+    });
+
+    it("falls back to fallbackKey when label is empty", () => {
+      expect(phrasePrompt("", "userId")).toBe("What's your userId?");
+      expect(phrasePrompt("   ", "userId")).toBe("What's your userId?");
     });
   });
 });
