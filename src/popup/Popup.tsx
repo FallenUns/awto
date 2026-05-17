@@ -15,6 +15,8 @@ export function formatFailureReason(reason: string): string {
       return "The field's selector could not be parsed.";
     case "unsupported element":
       return "The field type isn't something we can fill automatically.";
+    case "label mismatch":
+      return "The page label did not match the mapped profile field, so Awto left it for you to fill manually.";
     default:
       return reason;
   }
@@ -39,6 +41,8 @@ export function Popup() {
   const fillDisabled =
     fillCount === 0 &&
     state.missingRows.every((r) => r.userValue.trim() === "");
+  const isMappingOrReady =
+    status === "mapping" || status === "ready" || status === "filling";
 
   return (
     <div className="awto-popup">
@@ -57,17 +61,58 @@ export function Popup() {
           <FieldRow kind="loading" fieldId={-1} label="Scanning the form…" />
         )}
 
-        {status === "mapping" &&
-          state.loadingFields.map((f) => (
-            <FieldRow
-              key={f.id}
-              kind="loading"
-              fieldId={f.id}
-              label={f.label || `Field ${f.id}`}
-            />
-          ))}
+        {isMappingOrReady && state.loadingFields.length > 0 &&
+          state.loadingFields.map((f) => {
+            const fill = state.fillRows.find((r) => r.fieldId === f.id);
+            if (fill) {
+              return (
+                <FieldRow
+                  key={`fill-${f.id}`}
+                  kind="fill"
+                  fieldId={f.id}
+                  label={fill.label}
+                  value={fill.resolvedValue}
+                  confidence={fill.confidence}
+                />
+              );
+            }
+            const missing = state.missingRows.find((r) => r.fieldId === f.id);
+            if (missing) {
+              return (
+                <FieldRow
+                  key={`missing-${f.id}`}
+                  kind="missing"
+                  fieldId={f.id}
+                  label={missing.label}
+                  value={missing.userValue}
+                  promptText={missing.promptText}
+                  onChangeValue={(v) => setMissingValue(f.id, v)}
+                />
+              );
+            }
+            const skip = state.skippedRows.find((r) => r.fieldId === f.id);
+            if (skip) {
+              return (
+                <FieldRow
+                  key={`skip-${f.id}`}
+                  kind="skip"
+                  fieldId={f.id}
+                  label={skip.label}
+                  reason={skip.reason}
+                />
+              );
+            }
+            return (
+              <FieldRow
+                key={`loading-${f.id}`}
+                kind="loading"
+                fieldId={f.id}
+                label={f.label || `Field ${f.id}`}
+              />
+            );
+          })}
 
-        {(status === "ready" || status === "filling") && (
+        {isMappingOrReady && state.loadingFields.length === 0 && (
           <>
             {state.fillRows.map((r) => (
               <FieldRow
@@ -156,10 +201,10 @@ export function Popup() {
         )}
       </main>
 
-      {(status === "ready" || status === "filling") && (
+      {isMappingOrReady && (
         <ActionBar
           filling={status === "filling"}
-          fillDisabled={fillDisabled}
+          fillDisabled={status !== "ready" || fillDisabled}
           fillCount={totalToFill}
           onCancel={cancel}
           onFill={() => void fill()}

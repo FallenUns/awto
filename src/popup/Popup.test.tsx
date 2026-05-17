@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import type { AwtoMessage } from "@/shared/messages";
+import type { FlowState, FlowStatus } from "./types";
 
 (globalThis as unknown as { chrome: unknown }).chrome = {
   runtime: {
@@ -84,5 +85,106 @@ describe("formatFailureReason", () => {
     expect(formatFailureReason("no matching option")).toMatch(
       /dropdown did not have a matching option/i
     );
+  });
+
+  it("explains when live page label disagrees with the mapped field", () => {
+    expect(formatFailureReason("label mismatch")).toMatch(
+      /label did not match/i
+    );
+  });
+});
+
+function mockFlow(overrides: { status: FlowStatus; state: Partial<FlowState> }) {
+  vi.doMock("./useAwtoFlow", () => ({
+    useAwtoFlow: () => ({
+      status: overrides.status,
+      state: {
+        status: overrides.status,
+        error: null,
+        fields: [],
+        mappings: [],
+        fillRows: [],
+        missingRows: [],
+        skippedRows: [],
+        filledCount: 0,
+        failedFills: [],
+        chunksCompleted: 0,
+        loadingFields: [],
+        ...overrides.state,
+      } as FlowState,
+      setMissingValue: vi.fn(),
+      fill: vi.fn(),
+      retry: vi.fn(),
+      cancel: vi.fn(),
+      rescan: vi.fn(),
+    }),
+  }));
+}
+
+describe("Popup progressive row resolution", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  it("renders resolved fill rows in their fieldId slot during mapping; remaining rows shimmer", async () => {
+    mockFlow({
+      status: "mapping",
+      state: {
+        loadingFields: [
+          { id: 0, selector: "#a", label: "First name", placeholder: null, type: "text", required: false },
+          { id: 1, selector: "#b", label: "Email", placeholder: null, type: "email", required: false },
+          { id: 2, selector: "#c", label: "Mystery", placeholder: null, type: "text", required: false },
+        ],
+        fillRows: [
+          { fieldId: 0, selector: "#a", label: "First name", profileKey: "firstName", resolvedValue: "Patrick", confidence: 1 },
+          { fieldId: 1, selector: "#b", label: "Email", profileKey: "email", resolvedValue: "p@x.com", confidence: 1 },
+        ],
+      },
+    });
+    const { Popup: PopupDyn } = await import("./Popup");
+    const { render: renderDyn, screen: screenDyn } = await import("@testing-library/react");
+    renderDyn(<PopupDyn />);
+    expect(screenDyn.getByText("Patrick")).toBeTruthy();
+    expect(screenDyn.getByText("p@x.com")).toBeTruthy();
+    expect(document.querySelectorAll(".awto-shimmer")).toHaveLength(1);
+    expect(document.querySelectorAll(".awto-fieldrow")).toHaveLength(3);
+  });
+
+  it("renders ActionBar with Fill disabled during mapping", async () => {
+    mockFlow({
+      status: "mapping",
+      state: {
+        loadingFields: [
+          { id: 0, selector: "#a", label: "First name", placeholder: null, type: "text", required: false },
+        ],
+        fillRows: [
+          { fieldId: 0, selector: "#a", label: "First name", profileKey: "firstName", resolvedValue: "Patrick", confidence: 1 },
+        ],
+      },
+    });
+    const { Popup: PopupDyn } = await import("./Popup");
+    const { render: renderDyn, screen: screenDyn } = await import("@testing-library/react");
+    renderDyn(<PopupDyn />);
+    const fillBtn = screenDyn.getByRole("button", { name: /mapping|fill/i });
+    expect((fillBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("ActionBar Fill is enabled in ready state when there's at least one fillable row", async () => {
+    mockFlow({
+      status: "ready",
+      state: {
+        loadingFields: [
+          { id: 0, selector: "#a", label: "First name", placeholder: null, type: "text", required: false },
+        ],
+        fillRows: [
+          { fieldId: 0, selector: "#a", label: "First name", profileKey: "firstName", resolvedValue: "Patrick", confidence: 1 },
+        ],
+      },
+    });
+    const { Popup: PopupDyn } = await import("./Popup");
+    const { render: renderDyn, screen: screenDyn } = await import("@testing-library/react");
+    renderDyn(<PopupDyn />);
+    const fillBtn = screenDyn.getByRole("button", { name: /fill 1 field/i });
+    expect((fillBtn as HTMLButtonElement).disabled).toBe(false);
   });
 });
