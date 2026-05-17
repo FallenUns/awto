@@ -116,6 +116,55 @@ describe("handleMessage", () => {
     expect(callHybrid.mock.calls[0]?.[1]).toEqual([taggedFields[1]]);
   });
 
+  it("does not call the LLM for a fully-recognized RoboForm-style page", async () => {
+    const loadLLMSettings = vi.fn().mockResolvedValue(defaultSettings);
+    const callHybrid = vi.fn();
+    const roboFields: ScannedField[] = [
+      { id: 0, selector: "#title", label: "Title", placeholder: null, type: "text", required: false },
+      { id: 1, selector: "#first", label: "First Name", placeholder: null, type: "text", required: false },
+      { id: 2, selector: "#middle-initial", label: "Middle Initial", placeholder: null, type: "text", required: false },
+      { id: 3, selector: "#last", label: "Last Name", placeholder: null, type: "text", required: false },
+      { id: 4, selector: "#full", label: "Full Name", placeholder: null, type: "text", required: false },
+      { id: 5, selector: "#city", label: "City", placeholder: null, type: "text", required: false },
+      { id: 6, selector: "#sex", label: "Sex", placeholder: null, type: "text", required: false },
+      { id: 7, selector: "#cc", label: "Credit Card Number", placeholder: null, type: "text", required: false },
+      { id: 8, selector: "#dob-month", label: "Month", placeholder: null, type: "select", required: false, options: ["Month", "Jan"] },
+      { id: 9, selector: "#age", label: "Age", placeholder: null, type: "text", required: false },
+    ];
+    const richProfile: Profile = {
+      title: "Mr",
+      firstName: "Patrick",
+      lastName: "Adrianus",
+      city: "Melbourne",
+      gender: "Male",
+      dateOfBirth: "2000-01-01",
+      custom: {},
+    };
+
+    const response = await handleMessage(
+      { type: "mapFields", fields: roboFields, profile: richProfile },
+      { _loadLLMSettings: loadLLMSettings, _callHybrid: callHybrid }
+    );
+
+    expect(response.type).toBe("mapFieldsComplete");
+    expect(callHybrid).not.toHaveBeenCalled();
+    expect(loadLLMSettings).not.toHaveBeenCalled();
+    if (response.type === "mapFieldsComplete") {
+      expect(response.mappings).toHaveLength(roboFields.length);
+      expect(response.mappings.find((m) => m.fieldId === 6)).toMatchObject({
+        actionType: "fill",
+        profileKey: "gender",
+      });
+      expect(response.mappings.find((m) => m.fieldId === 7)).toMatchObject({
+        actionType: "skip",
+      });
+      expect(response.mappings.find((m) => m.fieldId === 9)).toMatchObject({
+        actionType: "fill",
+        profileKey: "age",
+      });
+    }
+  });
+
   it("does not allow the LLM to map delivery time to dateOfBirth", async () => {
     const deliveryFields: ScannedField[] = [
       {

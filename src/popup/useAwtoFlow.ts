@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AwtoMessage, ScannedField } from "@/shared/messages";
+import type { AwtoMessage, FillValue, ScannedField } from "@/shared/messages";
 import {
   isFillMapping,
   isMissingMapping,
@@ -347,11 +347,16 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
 
     try {
       const current = stateRef.current;
-      const values: Array<{ selector: string; value: string }> = [];
+      const values: FillValue[] = [];
 
       for (const row of current.fillRows) {
         if (row.resolvedValue !== "") {
-          values.push({ selector: row.selector, value: row.resolvedValue });
+          values.push({
+            selector: row.selector,
+            value: row.resolvedValue,
+            label: row.label,
+            profileKey: row.profileKey,
+          });
         }
       }
 
@@ -360,7 +365,12 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
       for (const row of current.missingRows) {
         const trimmed = row.userValue.trim();
         if (trimmed === "") continue;
-        values.push({ selector: row.selector, value: trimmed });
+        values.push({
+          selector: row.selector,
+          value: trimmed,
+          label: row.label,
+          profileKey: row.suggestedKey,
+        });
         nextProfile = setProfileValue(nextProfile, row.suggestedKey, trimmed);
         profileChanged = true;
       }

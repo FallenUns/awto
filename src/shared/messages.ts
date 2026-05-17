@@ -12,6 +12,13 @@ export interface ScannedField {
   autocomplete?: string;
 }
 
+export interface FillValue {
+  selector: string;
+  value: string;
+  label?: string;
+  profileKey?: string;
+}
+
 export type AwtoMessage =
   | { type: "scanForm" }
   | { type: "scanFormResult"; fields: ScannedField[] }
@@ -34,7 +41,7 @@ export type AwtoMessage =
       source: "local" | "cloud" | "mixed";
     }
   | { type: "mapFieldsError"; error: string }
-  | { type: "fillForm"; values: Array<{ selector: string; value: string }> }
+  | { type: "fillForm"; values: FillValue[] }
   | {
       type: "fillFormResult";
       filled: number;

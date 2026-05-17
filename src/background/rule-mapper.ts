@@ -39,11 +39,27 @@ const TOKEN_TO_KEY: Record<string, string | null> = {
 type KeyChoice = string | string[];
 
 interface LabelRule {
-  key: KeyChoice;
+  key?: KeyChoice;
   patterns: RegExp[];
+  skipReason?: string;
+  missingKey?: string;
+  missingPrompt?: string;
 }
 
 const LABEL_RULES: LabelRule[] = [
+  { patterns: [/\b(password|passcode|pin)\b/], skipReason: "Sensitive credential — fill manually" },
+  { patterns: [/\bcredit\s*card\b/, /\bcard\s*(number|verification|expiration|expiry|issuing|bank|customer\s*service|type|user\s*name)\b/, /\bcvv\b/, /\bcvc\b/, /\bccv\b/], skipReason: "Payment field — fill manually" },
+  { patterns: [/\bsocial\s*security\b/, /\bssn\b/], skipReason: "Sensitive government identifier — fill manually" },
+  { patterns: [/\bfax\b/], skipReason: "Fax number not in profile" },
+  { patterns: [/\bmiddle\s*initial\b/], missingKey: "middleInitial", missingPrompt: "What's your middle initial?" },
+  { patterns: [/\buser\s*id\b/, /\buser\s*name\b/, /\blogin\b/], missingKey: "userId", missingPrompt: "What's your user ID?" },
+  { patterns: [/\bbirth\s*place\b/, /\bplace\s*of\s*birth\b/], missingKey: "birthPlace", missingPrompt: "What's your birth place?" },
+  { patterns: [/\bincome\b/, /\bsalary\b/], missingKey: "income", missingPrompt: "What's your income?" },
+  { patterns: [/\bcustom\s*message\b/], missingKey: "customMessage", missingPrompt: "What's your custom message?" },
+  { patterns: [/\bcomments?\b/, /\bnotes?\b/], missingKey: "comments", missingPrompt: "Any comments?" },
+  { key: "dateOfBirthMonth", patterns: [/^month$/] },
+  { key: "dateOfBirthDay", patterns: [/^day$/] },
+  { key: "dateOfBirthYear", patterns: [/^year$/] },
   { key: "title", patterns: [/\b(title|honou?rific|salutation)\b/] },
   { key: "firstName", patterns: [/\b(first|given|forename)\s*name\b/, /\bgiven\b/] },
   { key: "middleName", patterns: [/\b(middle|additional)\s*name\b/] },
@@ -51,30 +67,31 @@ const LABEL_RULES: LabelRule[] = [
   { key: "preferredName", patterns: [/\bpreferred\s*name\b/, /\bnickname\b/] },
   { key: "fullName", patterns: [/\b(full|your|customer|applicant|contact)\s*name\b/, /^name$/] },
   { key: "pronouns", patterns: [/\bpronouns?\b/] },
-  { key: "gender", patterns: [/\bgender\b/] },
+  { key: "gender", patterns: [/\bgender\b/, /\bsex\b/] },
   { key: "dateOfBirth", patterns: [/\bdate\s*of\s*birth\b/, /\bbirth\s*date\b/, /\bdob\b/] },
-  { key: "secondaryEmail", patterns: [/\b(secondary|alternate|alternative)\s*e-?mail\b/] },
-  { key: "email", patterns: [/\be-?mail\b/] },
+  { key: "age", patterns: [/\bage\b/] },
+  { key: "secondaryEmail", patterns: [/\b(secondary|alternate|alternative)\s*e\s*mail\b/, /\b(secondary|alternate|alternative)\s*email\b/] },
+  { key: "email", patterns: [/\be\s*mail\b/, /\bemail\b/] },
   { key: ["mobilePhone", "phone"], patterns: [/\b(mobile|cell)\b/] },
   { key: ["phone", "mobilePhone"], patterns: [/\b(phone|telephone|tel)\b/] },
   { key: "addressLine2", patterns: [/\b(address|street)?\s*line\s*2\b/, /\bapt\b/, /\bapartment\b/, /\bunit\b/, /\bsuite\b/] },
-  { key: "addressLine1", patterns: [/\bstreet\s*address\b/, /\b(address|street)?\s*line\s*1\b/, /^address$/] },
+  { key: ["addressLine1WithUnit", "addressLine1"], patterns: [/\bstreet\s*address\b/, /\b(address|street)?\s*line\s*1\b/, /^address$/] },
   { key: "suburb", patterns: [/\bsuburb\b/] },
   { key: "city", patterns: [/\bcity\b/, /\btown\b/, /\blocality\b/] },
   { key: "state", patterns: [/\bstate\b/, /\bprovince\b/, /\bregion\b/] },
   { key: "postcode", patterns: [/\bpost\s*code\b/, /\bpostcode\b/, /\bzip(\s*code)?\b/, /\bpostal\s*code\b/] },
   { key: "country", patterns: [/\bcountry\b/] },
   { key: "currentEmployer", patterns: [/\bcurrent\s*employer\b/, /\bemployer\b/, /\bcompany\b/] },
-  { key: "jobTitle", patterns: [/\bjob\s*title\b/, /\bposition\s*title\b/] },
+  { key: "jobTitle", patterns: [/\bjob\s*title\b/, /\bposition\s*title\b/, /\bposition\b/] },
   { key: "linkedIn", patterns: [/\blinked\s*in\b/] },
   { key: "github", patterns: [/\bgithub\b/] },
-  { key: "website", patterns: [/\b(personal\s*)?(website|url)\b/] },
+  { key: "website", patterns: [/\b(personal\s*)?(web\s*site|website|url)\b/] },
   { key: "highestQualification", patterns: [/\b(highest\s*)?qualification\b/, /\beducation\b/] },
   { key: "university", patterns: [/\buniversity\b/, /\binstitution\b/] },
   { key: "graduationYear", patterns: [/\bgraduation\s*year\b/] },
   { key: "taxFileNumber", patterns: [/\btax\s*file\s*number\b/, /\btfn\b/] },
   { key: "medicareNumber", patterns: [/\bmedicare\b/] },
-  { key: "driverLicense", patterns: [/\b(driver'?s?\s*)?licen[cs]e\b/] },
+  { key: "driverLicense", patterns: [/\b(driver'?s?\s*)?licen[cs]e(\s*number)?\b/] },
   { key: "nationality", patterns: [/\bnationality\b/] },
   { key: "workRights", patterns: [/\bwork\s*rights?\b/, /\bright\s*to\s*work\b/] },
 ];
@@ -112,14 +129,19 @@ function makeFill(fieldId: number, key: string): FieldMapping {
   };
 }
 
-function makeMissing(fieldId: number, key: string, label: string): FieldMapping {
+function makeMissing(
+  fieldId: number,
+  key: string,
+  label: string,
+  promptText?: string
+): FieldMapping {
   const friendly = label || key;
   return {
     fieldId,
     actionType: "missing",
     profileKey: null,
     suggestedKey: key,
-    promptText: `What's your ${friendly}?`,
+    promptText: promptText ?? `What's your ${friendly}?`,
     reason: null,
     confidence: 1,
   };
@@ -131,12 +153,35 @@ export function ruleMap(
 ): RuleMapResult {
   const ruleMappings: FieldMapping[] = [];
   const remaining: ScannedField[] = [];
+  const hasSeparateUnitOrAddressLine2 = fields.some((field) =>
+    /\b(address|street)?\s*line\s*2\b|\bapt\b|\bapartment\b|\bunit\b|\bsuite\b/.test(
+      fieldSignal(field)
+    )
+  );
 
   for (const field of fields) {
-    const labelKey = keyFromLabel(field, profile);
+    if (field.type === "password") {
+      ruleMappings.push(makeSkip(field.id, "Sensitive credential — fill manually"));
+      continue;
+    }
+
+    const labelResult = resultFromLabel(field, profile);
     const autocompleteKey = keyFromAutocomplete(field.autocomplete);
     const keyOrNull =
-      labelKey !== undefined ? labelKey : autocompleteKey;
+      labelResult?.type === "key" ? labelResult.key : autocompleteKey;
+    if (labelResult?.type === "skip") {
+      ruleMappings.push(makeSkip(field.id, labelResult.reason));
+      continue;
+    }
+    if (labelResult?.type === "missing") {
+      ruleMappings.push(makeMissing(
+        field.id,
+        labelResult.key,
+        field.label,
+        labelResult.promptText
+      ));
+      continue;
+    }
     if (keyOrNull === undefined) {
       remaining.push(field);
       continue;
@@ -147,7 +192,10 @@ export function ruleMap(
       continue;
     }
 
-    const key = keyOrNull;
+    const key =
+      keyOrNull === "addressLine1WithUnit" && hasSeparateUnitOrAddressLine2
+        ? "addressLine1"
+        : keyOrNull;
     const value = resolveValue(profile, key);
     if (value !== undefined && value !== "") {
       ruleMappings.push(makeFill(field.id, key));
@@ -164,21 +212,98 @@ function keyFromAutocomplete(token: string | undefined): string | null | undefin
   return TOKEN_TO_KEY[token];
 }
 
-function keyFromLabel(
+type LabelResult =
+  | { type: "key"; key: string }
+  | { type: "skip"; reason: string }
+  | { type: "missing"; key: string; promptText: string };
+
+function resultFromLabel(
   field: ScannedField,
   profile: Profile
-): string | undefined {
+): LabelResult | undefined {
   const signal = fieldSignal(field);
   if (!signal) return undefined;
 
+  const dobPartKey = dateOfBirthPartKey(field, signal);
+  if (dobPartKey) {
+    return resolveValue(profile, dobPartKey)
+      ? { type: "key", key: dobPartKey }
+      : {
+          type: "missing",
+          key: "dateOfBirth",
+          promptText: "What's your date of birth?",
+        };
+  }
+
   for (const rule of LABEL_RULES) {
     if (!rule.patterns.some((pattern) => pattern.test(signal))) continue;
+    if (rule.skipReason) return { type: "skip", reason: rule.skipReason };
+    if (rule.missingKey) {
+      return {
+        type: "missing",
+        key: rule.missingKey,
+        promptText: rule.missingPrompt ?? `What's your ${field.label || rule.missingKey}?`,
+      };
+    }
+    if (!rule.key) return undefined;
     const keys = Array.isArray(rule.key) ? rule.key : [rule.key];
-    return pickBestAvailableKey(profile, keys);
+    const key = pickBestAvailableKey(profile, keys);
+    return { type: "key", key };
   }
 
   return undefined;
 }
+
+function dateOfBirthPartKey(
+  field: ScannedField,
+  signal: string
+): "dateOfBirthMonth" | "dateOfBirthDay" | "dateOfBirthYear" | null {
+  if (field.type !== "select") return null;
+  if (!/\b(date\s*of\s*birth|birth\s*date|dob|month|day|year)\b/.test(signal)) {
+    return null;
+  }
+
+  const options = (field.options ?? []).map(normalizeSignal).filter(Boolean);
+  if (/^month$/.test(signal) || options.some((o) => MONTH_OPTION_WORDS.has(o))) {
+    return "dateOfBirthMonth";
+  }
+  if (/^day$/.test(signal) || options.includes("day")) {
+    return "dateOfBirthDay";
+  }
+  if (/^year$/.test(signal) || options.includes("year") || options.some((o) => /^\d{4}$/.test(o))) {
+    return "dateOfBirthYear";
+  }
+
+  return null;
+}
+
+const MONTH_OPTION_WORDS = new Set([
+  "month",
+  "jan",
+  "january",
+  "feb",
+  "february",
+  "mar",
+  "march",
+  "apr",
+  "april",
+  "may",
+  "jun",
+  "june",
+  "jul",
+  "july",
+  "aug",
+  "august",
+  "sep",
+  "sept",
+  "september",
+  "oct",
+  "october",
+  "nov",
+  "november",
+  "dec",
+  "december",
+]);
 
 function pickBestAvailableKey(profile: Profile, keys: string[]): string {
   return keys.find((key) => {

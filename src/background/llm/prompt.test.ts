@@ -54,6 +54,11 @@ describe("SYSTEM_PROMPT type-specific guidance", () => {
     expect(lower).toMatch(/telephone|mobile|tel\b/);
   });
 
+  it("instructs age fields to use computed age", () => {
+    expect(SYSTEM_PROMPT).toContain("profile.age");
+    expect(SYSTEM_PROMPT).toContain("computed from profile.dateOfBirth");
+  });
+
   it("warns against duplicating values across semantically different fields", () => {
     const lower = SYSTEM_PROMPT.toLowerCase();
     expect(lower).toMatch(/duplicate|same value|do not put the same/);
@@ -239,5 +244,23 @@ describe("buildUserPrompt addressLine1WithUnit composite", () => {
   it("SYSTEM_PROMPT instructs on unit/apt handling", () => {
     expect(SYSTEM_PROMPT.toLowerCase()).toMatch(/unit|apartment|apt/);
     expect(SYSTEM_PROMPT).toContain("addressLine1WithUnit");
+  });
+});
+
+describe("buildUserPrompt age composite", () => {
+  it("injects age when dateOfBirth exists", () => {
+    const profile: Profile = {
+      dateOfBirth: "2000-01-01",
+      custom: {},
+    };
+    const prompt = buildUserPrompt(profile, []);
+    expect(prompt).toMatch(/^- age: \d+/m);
+    expect(prompt).toContain("computed from dateOfBirth");
+  });
+
+  it("does NOT inject age when dateOfBirth is missing", () => {
+    const profile: Profile = { custom: {} };
+    const prompt = buildUserPrompt(profile, []);
+    expect(prompt).not.toMatch(/^- age:/m);
   });
 });

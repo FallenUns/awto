@@ -1,3 +1,5 @@
+import type { FillValue } from "@/shared/messages";
+
 export interface FillResult {
   filled: number;
   failed: Array<{ selector: string; reason: string }>;
@@ -5,15 +7,19 @@ export interface FillResult {
 
 export function fillFields(
   root: Document | HTMLElement,
-  values: Array<{ selector: string; value: string }>
+  values: FillValue[]
 ): FillResult {
   let filled = 0;
   const failed: Array<{ selector: string; reason: string }> = [];
 
-  for (const { selector, value } of values) {
+  for (const { selector, value, profileKey } of values) {
     const el = root.querySelector(selector);
     if (!el) {
       failed.push({ selector, reason: "selector not found" });
+      continue;
+    }
+    if (isSemanticallyUnsafeFill(el, profileKey)) {
+      failed.push({ selector, reason: "label mismatch" });
       continue;
     }
 
@@ -55,6 +61,10 @@ export function fillFields(
           o.value.trim().toLowerCase() === target ||
           (o.textContent ?? "").trim().toLowerCase() === target
       );
+
+      if (!matched) {
+        matched = monthOptionMatch(el, target);
+      }
 
       // 2. Substring match (both directions), if target is non-trivial
       if (!matched && target.length >= 2) {
@@ -107,6 +117,265 @@ export function fillFields(
 
   return { filled, failed };
 }
+
+function isSemanticallyUnsafeFill(
+  el: Element,
+  profileKey: string | undefined
+): boolean {
+  if (!profileKey) return false;
+  const label = liveLabel(el);
+  if (!label) return false;
+  if (/\bcity\b/.test(label)) {
+    return !["city", "suburb"].includes(profileKey);
+  }
+  if (/\bstreet\s*address\b|\baddress\s*line\s*1\b/.test(label)) {
+    return !["addressLine1", "addressLine1WithUnit"].includes(profileKey);
+  }
+  if (/\baddress\s*line\s*2\b|\bunit\b|\bapt\b|\bapartment\b|\bsuite\b/.test(label)) {
+    return !["addressLine2", "unitNumber"].includes(profileKey);
+  }
+  if (/\bstate\b|\bprovince\b|\bregion\b/.test(label)) {
+    return profileKey !== "state";
+  }
+  if (/\bcountry\b/.test(label)) {
+    return profileKey !== "country";
+  }
+  if (/\bzip\b|\bpost\s*code\b|\bpostcode\b|\bpostal\s*code\b/.test(label)) {
+    return profileKey !== "postcode";
+  }
+  return false;
+}
+
+function liveLabel(el: Element): string {
+  const ownerDoc = el.ownerDocument;
+  const id = el.getAttribute("id");
+  if (id) {
+    const explicit = nearestExplicitLabel(el, ownerDoc);
+    const text = explicit?.textContent?.trim();
+    if (text) return normalizeLabel(text);
+  }
+
+  const wrapper = el.closest("label");
+  if (wrapper) {
+    const clone = wrapper.cloneNode(true) as HTMLElement;
+    clone.querySelectorAll("input, select, textarea, button").forEach((n) => n.remove());
+    const text = clone.textContent?.trim();
+    if (text) return normalizeLabel(text);
+  }
+
+  const tableLabel = nearestTableHeaderText(el);
+  if (tableLabel) return normalizeLabel(tableLabel);
+
+  const visual = nearestVisualLabelText(el);
+  if (visual) return normalizeLabel(visual);
+
+  const sibling = nearestPrecedingText(el);
+  return normalizeLabel(sibling);
+}
+
+function nearestExplicitLabel(el: Element, doc: Document): HTMLLabelElement | null {
+  const id = el.getAttribute("id");
+  if (!id) return null;
+  const labels = Array.from(
+    doc.querySelectorAll<HTMLLabelElement>(`label[for="${cssEscape(id)}"]`)
+  );
+  if (labels.length <= 1) return labels[0] ?? null;
+
+  if (el instanceof HTMLElement) {
+    const target = el.getBoundingClientRect();
+    if (hasUsableRect(target)) {
+      let best: { label: HTMLLabelElement; score: number } | null = null;
+      for (const label of labels) {
+        const rect = label.getBoundingClientRect();
+        if (!hasUsableRect(rect)) continue;
+        const score = explicitLabelScore(rect, target);
+        if (score === null) continue;
+        if (!best || score < best.score) best = { label, score };
+      }
+      if (best) return best.label;
+    }
+  }
+
+  const preceding = labels
+    .filter((label) => label.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)
+    .at(-1);
+  return preceding ?? labels[0] ?? null;
+}
+
+function normalizeLabel(value: string): string {
+  return value
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[-_./:[\]"'=#>]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function nearestTableHeaderText(el: Element): string {
+  const cell = el.closest("td, th");
+  const row = cell?.parentElement;
+  if (!cell || !row) return "";
+  const cells = Array.from(row.children);
+  const index = cells.indexOf(cell);
+  for (let i = index - 1; i >= 0; i--) {
+    const candidate = cells[i] as HTMLElement | undefined;
+    const text = candidate?.textContent?.trim();
+    if (text) return text;
+  }
+  return "";
+}
+
+function nearestPrecedingText(el: Element): string {
+  let prev = el.previousElementSibling;
+  while (prev) {
+    if (prev.querySelector("input, select, textarea, button") || isFillableElement(prev)) {
+      prev = prev.previousElementSibling;
+      continue;
+    }
+    const text = directText(prev);
+    if (text) return text;
+    prev = prev.previousElementSibling;
+  }
+  return "";
+}
+
+function nearestVisualLabelText(el: Element): string {
+  if (!(el instanceof HTMLElement)) return "";
+  const target = el.getBoundingClientRect();
+  if (!hasUsableRect(target)) return "";
+  const candidates = Array.from(el.ownerDocument.body?.querySelectorAll<HTMLElement>("*") ?? []);
+  let best: { text: string; score: number } | null = null;
+
+  for (const candidate of candidates) {
+    if (candidate === el || candidate.contains(el)) continue;
+    if (isFillableElement(candidate)) continue;
+    if (candidate.querySelector("input, select, textarea, button")) continue;
+    if (candidate.closest("script, style, noscript")) continue;
+    const text = directText(candidate);
+    if (!text || text.length > 80) continue;
+    const rect = candidate.getBoundingClientRect();
+    if (!hasUsableRect(rect)) continue;
+    const score = visualLabelScore(rect, target);
+    if (score === null) continue;
+    if (!best || score < best.score) best = { text, score };
+  }
+
+  return best?.text ?? "";
+}
+
+function visualLabelScore(label: DOMRect, target: DOMRect): number | null {
+  const targetCenterY = target.top + target.height / 2;
+  const labelCenterY = label.top + label.height / 2;
+  const verticalDelta = Math.abs(labelCenterY - targetCenterY);
+  const maxSameRowDelta = Math.max(18, target.height * 0.9);
+  if (verticalDelta <= maxSameRowDelta && label.right <= target.left + 8) {
+    const horizontalGap = Math.max(0, target.left - label.right);
+    if (horizontalGap <= 360) return horizontalGap + verticalDelta * 3;
+  }
+  return null;
+}
+
+function explicitLabelScore(label: DOMRect, target: DOMRect): number | null {
+  const sameRow = visualLabelScore(label, target);
+  if (sameRow !== null) return sameRow;
+
+  const targetCenterX = target.left + target.width / 2;
+  const labelCenterX = label.left + label.width / 2;
+  const horizontalDelta = Math.abs(labelCenterX - targetCenterX);
+  const verticalGap = target.top - label.bottom;
+  if (verticalGap >= -4 && verticalGap <= 80) {
+    return 1000 + verticalGap * 5 + horizontalDelta;
+  }
+  return null;
+}
+
+function directText(el: Element): string {
+  return Array.from(el.childNodes)
+    .filter((node) => node.nodeType === Node.TEXT_NODE)
+    .map((node) => node.textContent ?? "")
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isFillableElement(el: Element): boolean {
+  return (
+    el instanceof HTMLInputElement ||
+    el instanceof HTMLSelectElement ||
+    el instanceof HTMLTextAreaElement ||
+    el instanceof HTMLButtonElement
+  );
+}
+
+function hasUsableRect(rect: DOMRect): boolean {
+  return rect.width > 0 && rect.height > 0;
+}
+
+function monthOptionMatch(
+  el: HTMLSelectElement,
+  target: string
+): HTMLOptionElement | undefined {
+  const month = MONTH_ALIASES[target];
+  if (!month) return undefined;
+  return Array.from(el.options).find((o) => {
+    const value = normalizeMonthToken(o.value);
+    const text = normalizeMonthToken(o.textContent ?? "");
+    return value === month || text === month;
+  });
+}
+
+function normalizeMonthToken(value: string): string {
+  const normalized = value.trim().toLowerCase();
+  return MONTH_ALIASES[normalized] ?? normalized;
+}
+
+const MONTH_ALIASES: Record<string, string> = {
+  "1": "01",
+  "01": "01",
+  jan: "01",
+  january: "01",
+  "2": "02",
+  "02": "02",
+  feb: "02",
+  february: "02",
+  "3": "03",
+  "03": "03",
+  mar: "03",
+  march: "03",
+  "4": "04",
+  "04": "04",
+  apr: "04",
+  april: "04",
+  "5": "05",
+  "05": "05",
+  may: "05",
+  "6": "06",
+  "06": "06",
+  jun: "06",
+  june: "06",
+  "7": "07",
+  "07": "07",
+  jul: "07",
+  july: "07",
+  "8": "08",
+  "08": "08",
+  aug: "08",
+  august: "08",
+  "9": "09",
+  "09": "09",
+  sep: "09",
+  sept: "09",
+  september: "09",
+  "10": "10",
+  oct: "10",
+  october: "10",
+  "11": "11",
+  nov: "11",
+  november: "11",
+  "12": "12",
+  dec: "12",
+  december: "12",
+};
 
 function setNativeValue(
   el: HTMLInputElement | HTMLTextAreaElement,

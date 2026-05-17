@@ -5,6 +5,26 @@ function setBody(html: string): void {
   document.body.innerHTML = html;
 }
 
+function setRect(
+  selector: string,
+  rect: { left: number; top: number; width: number; height: number }
+): void {
+  const el = document.querySelector(selector) as HTMLElement | null;
+  if (!el) throw new Error(`Missing element ${selector}`);
+  const full = {
+    x: rect.left,
+    y: rect.top,
+    left: rect.left,
+    top: rect.top,
+    width: rect.width,
+    height: rect.height,
+    right: rect.left + rect.width,
+    bottom: rect.top + rect.height,
+    toJSON: () => ({}),
+  } as DOMRect;
+  el.getBoundingClientRect = () => full;
+}
+
 describe("fillFields", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
@@ -181,6 +201,84 @@ describe("fillFields", () => {
       reason: "no matching option",
     });
   });
+
+  it("refuses to put street address into a field visibly labelled City", () => {
+    setBody(`
+      <form>
+        <label for="city">City</label>
+        <input id="city" name="address-line1" />
+      </form>
+    `);
+
+    const result = fillFields(document, [
+      {
+        selector: "#city",
+        value: "327 La Trobe Street",
+        label: "Street address",
+        profileKey: "addressLine1",
+      },
+    ]);
+
+    expect(result.filled).toBe(0);
+    expect(result.failed).toEqual([
+      { selector: "#city", reason: "label mismatch" },
+    ]);
+    expect((document.querySelector("#city") as HTMLInputElement).value).toBe("");
+  });
+
+  it("uses the nearest duplicate explicit label before deciding whether a fill is safe", () => {
+    setBody(`
+      <form>
+        <label for="address-line1">Street address</label>
+        <input id="street" />
+        <label for="address-line1">City</label>
+        <input id="address-line1" name="address-line1" />
+      </form>
+    `);
+
+    const result = fillFields(document, [
+      {
+        selector: "#address-line1",
+        value: "327 La Trobe Street",
+        label: "Street address",
+        profileKey: "addressLine1",
+      },
+    ]);
+
+    expect(result.filled).toBe(0);
+    expect(result.failed).toEqual([
+      { selector: "#address-line1", reason: "label mismatch" },
+    ]);
+    expect(
+      (document.querySelector("#address-line1") as HTMLInputElement).value
+    ).toBe("");
+  });
+
+  it("allows city value into a visually labelled City field despite misleading HTML", () => {
+    setBody(`
+      <form>
+        <div id="city-label">City</div>
+        <input id="city" name="address-line1" />
+      </form>
+    `);
+    setRect("#city-label", { left: 100, top: 20, width: 60, height: 20 });
+    setRect("#city", { left: 220, top: 15, width: 180, height: 32 });
+
+    const result = fillFields(document, [
+      {
+        selector: "#city",
+        value: "Melbourne",
+        label: "City",
+        profileKey: "city",
+      },
+    ]);
+
+    expect(result.filled).toBe(1);
+    expect(result.failed).toEqual([]);
+    expect((document.querySelector("#city") as HTMLInputElement).value).toBe(
+      "Melbourne"
+    );
+  });
 });
 
 describe("fillFields select fuzzy match", () => {
@@ -250,5 +348,31 @@ describe("fillFields select fuzzy match", () => {
     const result = fillFields(document, [{ selector: "#x", value: "Austria" }]);
     expect(result.filled).toBe(1);
     expect((document.querySelector("#x") as HTMLSelectElement).value).toBe("b");
+  });
+
+  it("matches numeric month values to month names", () => {
+    setBody(`
+      <select id="month">
+        <option value="">Month</option>
+        <option value="Jan">Jan</option>
+        <option value="Feb">Feb</option>
+      </select>
+    `);
+    const result = fillFields(document, [{ selector: "#month", value: "01" }]);
+    expect(result.filled).toBe(1);
+    expect((document.querySelector("#month") as HTMLSelectElement).value).toBe("Jan");
+  });
+
+  it("matches month names to numeric option values", () => {
+    setBody(`
+      <select id="month">
+        <option value="">Month</option>
+        <option value="01">January</option>
+        <option value="02">February</option>
+      </select>
+    `);
+    const result = fillFields(document, [{ selector: "#month", value: "Jan" }]);
+    expect(result.filled).toBe(1);
+    expect((document.querySelector("#month") as HTMLSelectElement).value).toBe("01");
   });
 });

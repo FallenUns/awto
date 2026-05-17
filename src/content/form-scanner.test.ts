@@ -5,6 +5,26 @@ function setBody(html: string): void {
   document.body.innerHTML = html;
 }
 
+function setRect(
+  selector: string,
+  rect: { left: number; top: number; width: number; height: number }
+): void {
+  const el = document.querySelector(selector) as HTMLElement | null;
+  if (!el) throw new Error(`Missing element ${selector}`);
+  const full = {
+    x: rect.left,
+    y: rect.top,
+    left: rect.left,
+    top: rect.top,
+    width: rect.width,
+    height: rect.height,
+    right: rect.left + rect.width,
+    bottom: rect.top + rect.height,
+    toJSON: () => ({}),
+  } as DOMRect;
+  el.getBoundingClientRect = () => full;
+}
+
 describe("scanFields", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
@@ -102,6 +122,60 @@ describe("scanFields", () => {
     const fields = scanFields(document);
     expect(fields[0]?.label).toBe("City");
     expect(fields[0]?.autocomplete).toBe("address-line1");
+  });
+
+  it("chooses the nearest explicit label when several labels point at the same bad id", () => {
+    setBody(`
+      <form>
+        <label for="address-line1">Street address</label>
+        <input id="street" name="street" />
+        <label for="address-line1">City</label>
+        <input id="address-line1" name="address-line1" autocomplete="address-line1" />
+      </form>
+    `);
+    const fields = scanFields(document);
+    expect(fields[1]?.selector).toBe("#address-line1");
+    expect(fields[1]?.label).toBe("City");
+    expect(fields[1]?.autocomplete).toBe("address-line1");
+  });
+
+  it("uses nearby left-of-field text when markup does not connect the label", () => {
+    setBody(`
+      <form>
+        <div id="title-label">Title</div><input id="title" />
+        <div id="city-label">City</div><input id="city" name="address-line1" autocomplete="address-line1" />
+      </form>
+    `);
+    setRect("#title-label", { left: 100, top: 20, width: 70, height: 20 });
+    setRect("#title", { left: 220, top: 15, width: 180, height: 32 });
+    setRect("#city-label", { left: 100, top: 70, width: 70, height: 20 });
+    setRect("#city", { left: 220, top: 65, width: 180, height: 32 });
+
+    const fields = scanFields(document);
+    expect(fields[0]?.label).toBe("Title");
+    expect(fields[1]?.label).toBe("City");
+    expect(fields[1]?.autocomplete).toBe("address-line1");
+  });
+
+  it("does not use previous form controls or select option text as labels", () => {
+    setBody(`
+      <form>
+        <select id="month">
+          <option>Month</option>
+          <option>Jan</option>
+          <option>Feb</option>
+        </select>
+        <select id="day">
+          <option>Day</option>
+          <option>01</option>
+          <option>02</option>
+        </select>
+      </form>
+    `);
+
+    const fields = scanFields(document);
+    expect(fields[0]?.label).toBe("");
+    expect(fields[1]?.label).toBe("");
   });
 
   it("returns empty-string label when nothing identifies the field", () => {

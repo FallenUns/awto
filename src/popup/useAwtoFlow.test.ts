@@ -327,8 +327,18 @@ describe("useAwtoFlow", () => {
     expect(fillCall).toBeDefined();
     const fillMsg = fillCall![1] as AwtoMessage & { type: "fillForm" };
     expect(fillMsg.values).toEqual([
-      { selector: "#fname", value: "Patrick" },
-      { selector: "#favcolor", value: "indigo" },
+      {
+        selector: "#fname",
+        value: "Patrick",
+        label: "First name",
+        profileKey: "firstName",
+      },
+      {
+        selector: "#favcolor",
+        value: "indigo",
+        label: "Favourite colour",
+        profileKey: "favouriteColour",
+      },
     ]);
     expect(result.current.status).toBe("done");
     expect(result.current.state.filledCount).toBe(2);
@@ -356,7 +366,14 @@ describe("useAwtoFlow", () => {
       (call) => (call[1] as AwtoMessage).type === "fillForm"
     );
     const fillMsg = fillCall![1] as AwtoMessage & { type: "fillForm" };
-    expect(fillMsg.values).toEqual([{ selector: "#fname", value: "Pat" }]);
+    expect(fillMsg.values).toEqual([
+      {
+        selector: "#fname",
+        value: "Pat",
+        label: "First name",
+        profileKey: "firstName",
+      },
+    ]);
   });
 
   it("resolves computed fullName mappings into a fillable value", async () => {

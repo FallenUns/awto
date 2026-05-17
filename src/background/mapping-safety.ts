@@ -46,6 +46,7 @@ const INTENT_RULES: IntentRule[] = [
   },
   {
     patterns: [/\bage\b/],
+    allow: ["age"],
     suggestedKey: "age",
   },
   {

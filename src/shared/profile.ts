@@ -124,12 +124,44 @@ export function getProfileValue(
   }
   if (key === "addressLine1WithUnit") {
     const line = profile.addressLine1?.trim();
-    if (!line) return undefined;
     const unit = profile.unitNumber?.trim();
-    return unit ? `${unit}/${line}` : line;
+    if (!line || !unit) return undefined;
+    return `${unit}/${line}`;
   }
+  if (key === "dateOfBirthYear") return dateOfBirthPart(profile, 0);
+  if (key === "dateOfBirthMonth") return dateOfBirthPart(profile, 1);
+  if (key === "dateOfBirthDay") return dateOfBirthPart(profile, 2);
+  if (key === "age") return ageFromDateOfBirth(profile);
   if (isBuiltInKey(key)) return profile[key];
   return profile.custom[key];
+}
+
+function dateOfBirthPart(
+  profile: Profile,
+  index: 0 | 1 | 2
+): string | undefined {
+  const dob = profile.dateOfBirth?.trim();
+  if (!dob) return undefined;
+  return dob.split("-")[index];
+}
+
+function ageFromDateOfBirth(profile: Profile): string | undefined {
+  const dob = profile.dateOfBirth?.trim();
+  if (!dob) return undefined;
+
+  const [yearText, monthText, dayText] = dob.split("-");
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  if (!year || !month || !day) return undefined;
+
+  const today = new Date();
+  let age = today.getFullYear() - year;
+  const birthdayHasPassed =
+    today.getMonth() + 1 > month ||
+    (today.getMonth() + 1 === month && today.getDate() >= day);
+  if (!birthdayHasPassed) age -= 1;
+  return age >= 0 ? String(age) : undefined;
 }
 
 export function setProfileValue(

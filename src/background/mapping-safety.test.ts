@@ -128,6 +128,7 @@ describe("sanitizeMappings", () => {
       fill(4, "email"),
       fill(5, "website"),
       fill(6, "dateOfBirth"),
+      fill(7, "age"),
     ];
 
     expect(
@@ -140,6 +141,7 @@ describe("sanitizeMappings", () => {
           field(4, "E-mail"),
           field(5, "Web Site"),
           field(6, "Date Of Birth"),
+          field(7, "Age"),
         ],
         mappings
       )

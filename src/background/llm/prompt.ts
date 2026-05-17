@@ -35,6 +35,7 @@ Common label synonyms to map to a single profile key:
 - "Phone" / "Phone number" / "Telephone" / "Mobile" / "Cell" / "Tel" → profile.phone or profile.mobilePhone
 - "Postcode" / "Zip" / "Zip code" / "Postal code" → profile.postcode
 - "Suburb" / "City" / "Town" / "Locality" → profile.suburb or profile.city (whichever you populated)
+- "Age" → profile.age when listed; it is computed from profile.dateOfBirth and today's date
 
 When the form has a single name-style field labeled "Name", "Full name", "Customer name", "Your name", or similar, map to "fullName" (the firstName + lastName composite) — do NOT use firstName alone.
 
@@ -68,6 +69,13 @@ export function buildUserPrompt(
   if (unit && line1) {
     profileLines.push(
       `- addressLine1WithUnit: ${unit}/${line1}    (computed; use for single street-address fields when the form has no separate unit/apt input)`
+    );
+  }
+
+  const age = getProfileValue(profile, "age");
+  if (age) {
+    profileLines.push(
+      `- age: ${age}    (computed from dateOfBirth and today's date; use only for fields explicitly asking age)`
     );
   }
 

@@ -213,7 +213,7 @@ function buildNthSelector(el: HTMLElement): string {
 
 function extractLabel(el: Fillable, doc: Document): string {
   if (el.id) {
-    const lbl = doc.querySelector(`label[for="${cssEscape(el.id)}"]`);
+    const lbl = nearestExplicitLabel(el, doc);
     const text = lbl?.textContent?.trim();
     if (text) return text;
   }
@@ -241,9 +241,38 @@ function extractLabel(el: Fillable, doc: Document): string {
   if (placeholder && placeholder.trim()) return placeholder.trim();
   const tableLabel = nearestTableHeaderText(el);
   if (tableLabel) return tableLabel;
+  const visualLabel = nearestVisualLabelText(el, doc);
+  if (visualLabel) return visualLabel;
   const sibling = nearestPrecedingText(el);
   if (sibling) return sibling;
   return "";
+}
+
+function nearestExplicitLabel(el: HTMLElement, doc: Document): HTMLLabelElement | null {
+  const id = el.id;
+  if (!id) return null;
+  const labels = Array.from(
+    doc.querySelectorAll<HTMLLabelElement>(`label[for="${cssEscape(id)}"]`)
+  ).filter((label) => !isHidden(label));
+  if (labels.length <= 1) return labels[0] ?? null;
+
+  const target = el.getBoundingClientRect();
+  if (hasUsableRect(target)) {
+    let best: { label: HTMLLabelElement; score: number } | null = null;
+    for (const label of labels) {
+      const rect = label.getBoundingClientRect();
+      if (!hasUsableRect(rect)) continue;
+      const score = explicitLabelScore(rect, target);
+      if (score === null) continue;
+      if (!best || score < best.score) best = { label, score };
+    }
+    if (best) return best.label;
+  }
+
+  const preceding = labels
+    .filter((label) => label.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)
+    .at(-1);
+  return preceding ?? labels[0] ?? null;
 }
 
 function nearestTableHeaderText(el: HTMLElement): string {
@@ -263,9 +292,103 @@ function nearestTableHeaderText(el: HTMLElement): string {
 function nearestPrecedingText(el: HTMLElement): string {
   let prev = el.previousElementSibling;
   while (prev) {
-    const text = prev.textContent?.trim();
+    if (prev.querySelector("input, select, textarea, button")) {
+      prev = prev.previousElementSibling;
+      continue;
+    }
+    if (isFillableElement(prev)) {
+      prev = prev.previousElementSibling;
+      continue;
+    }
+    const text = directText(prev);
     if (text) return text;
     prev = prev.previousElementSibling;
   }
   return "";
+}
+
+function nearestVisualLabelText(el: HTMLElement, doc: Document): string {
+  const target = el.getBoundingClientRect();
+  if (!hasUsableRect(target)) return "";
+
+  const candidates = Array.from(doc.body?.querySelectorAll<HTMLElement>("*") ?? []);
+  let best: { text: string; score: number } | null = null;
+
+  for (const candidate of candidates) {
+    if (candidate === el || candidate.contains(el)) continue;
+    if (isFillableElement(candidate)) continue;
+    if (candidate.querySelector("input, select, textarea, button")) continue;
+    if (candidate.closest("script, style, noscript")) continue;
+    if (isHidden(candidate)) continue;
+
+    const text = directText(candidate);
+    if (!text || text.length > 80) continue;
+
+    const rect = candidate.getBoundingClientRect();
+    if (!hasUsableRect(rect)) continue;
+
+    const score = visualLabelScore(rect, target);
+    if (score === null) continue;
+    if (!best || score < best.score) best = { text, score };
+  }
+
+  return best?.text ?? "";
+}
+
+function visualLabelScore(label: DOMRect, target: DOMRect): number | null {
+  const targetCenterY = target.top + target.height / 2;
+  const labelCenterY = label.top + label.height / 2;
+  const verticalDelta = Math.abs(labelCenterY - targetCenterY);
+  const maxSameRowDelta = Math.max(18, target.height * 0.9);
+
+  if (verticalDelta <= maxSameRowDelta && label.right <= target.left + 8) {
+    const horizontalGap = Math.max(0, target.left - label.right);
+    if (horizontalGap <= 360) return horizontalGap + verticalDelta * 3;
+  }
+
+  const horizontalOverlap =
+    Math.min(label.right, target.right) - Math.max(label.left, target.left);
+  const minOverlap = Math.min(target.width, label.width) * 0.35;
+  const verticalGap = target.top - label.bottom;
+  if (verticalGap >= -4 && verticalGap <= 48 && horizontalOverlap >= minOverlap) {
+    return 1000 + verticalGap * 5 + Math.abs(label.left - target.left);
+  }
+
+  return null;
+}
+
+function explicitLabelScore(label: DOMRect, target: DOMRect): number | null {
+  const sameRow = visualLabelScore(label, target);
+  if (sameRow !== null) return sameRow;
+
+  const targetCenterX = target.left + target.width / 2;
+  const labelCenterX = label.left + label.width / 2;
+  const horizontalDelta = Math.abs(labelCenterX - targetCenterX);
+  const verticalGap = target.top - label.bottom;
+  if (verticalGap >= -4 && verticalGap <= 80) {
+    return 1000 + verticalGap * 5 + horizontalDelta;
+  }
+  return null;
+}
+
+function directText(el: Element): string {
+  return Array.from(el.childNodes)
+    .filter((node) => node.nodeType === Node.TEXT_NODE)
+    .map((node) => node.textContent ?? "")
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isFillableElement(el: Element): boolean {
+  return (
+    el instanceof HTMLInputElement ||
+    el instanceof HTMLSelectElement ||
+    el instanceof HTMLTextAreaElement ||
+    el instanceof HTMLButtonElement
+  );
+}
+
+function hasUsableRect(rect: DOMRect): boolean {
+  return rect.width > 0 && rect.height > 0;
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import {
   ProfileSchema,
   EMPTY_PROFILE,
@@ -125,11 +125,9 @@ describe("getProfileValue", () => {
     );
   });
 
-  it("getProfileValue returns addressLine1 unchanged when no unitNumber", () => {
+  it("getProfileValue returns undefined for addressLine1WithUnit when no unitNumber", () => {
     const p = { addressLine1: "206 La Trobe St", custom: {} };
-    expect(getProfileValue(p as Profile, "addressLine1WithUnit")).toBe(
-      "206 La Trobe St"
-    );
+    expect(getProfileValue(p as Profile, "addressLine1WithUnit")).toBeUndefined();
   });
 
   it("getProfileValue returns undefined for addressLine1WithUnit when no addressLine1", () => {
@@ -137,6 +135,31 @@ describe("getProfileValue", () => {
       getProfileValue({ custom: {} } as Profile, "addressLine1WithUnit")
     ).toBeUndefined();
   });
+
+  it("returns computed dateOfBirth parts", () => {
+    const p = { dateOfBirth: "2000-01-31", custom: {} };
+    expect(getProfileValue(p as Profile, "dateOfBirthYear")).toBe("2000");
+    expect(getProfileValue(p as Profile, "dateOfBirthMonth")).toBe("01");
+    expect(getProfileValue(p as Profile, "dateOfBirthDay")).toBe("31");
+  });
+
+  it("returns computed age from dateOfBirth after this year's birthday", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 4, 16));
+    const p = { dateOfBirth: "2000-01-01", custom: {} };
+    expect(getProfileValue(p as Profile, "age")).toBe("26");
+  });
+
+  it("returns computed age from dateOfBirth before this year's birthday", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 4, 16));
+    const p = { dateOfBirth: "2000-12-31", custom: {} };
+    expect(getProfileValue(p as Profile, "age")).toBe("25");
+  });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("setProfileValue", () => {
