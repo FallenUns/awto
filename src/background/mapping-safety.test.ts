@@ -148,6 +148,94 @@ describe("sanitizeMappings", () => {
     ).toEqual(mappings);
   });
 
+  describe("name/pronoun/phone deny-list", () => {
+    it("skips firstName on a Color picker field", () => {
+      const sanitized = sanitizeMappings(
+        [field(0, "Color picker", "color")],
+        [fill(0, "firstName")]
+      );
+      expect(sanitized[0]).toMatchObject({
+        actionType: "skip",
+        reason: expect.stringMatching(/doesn't fit/i),
+      });
+    });
+
+    it("skips fullName on a Search field", () => {
+      const sanitized = sanitizeMappings(
+        [field(0, "Search", "search")],
+        [fill(0, "fullName")]
+      );
+      expect(sanitized[0]).toMatchObject({ actionType: "skip" });
+    });
+
+    it("skips pronouns on a Search field", () => {
+      const sanitized = sanitizeMappings(
+        [field(0, "Search", "search")],
+        [fill(0, "pronouns")]
+      );
+      expect(sanitized[0]).toMatchObject({ actionType: "skip" });
+    });
+
+    it("skips phone on an Account field", () => {
+      const sanitized = sanitizeMappings(
+        [field(0, "Account")],
+        [fill(0, "phone")]
+      );
+      expect(sanitized[0]).toMatchObject({ actionType: "skip" });
+    });
+
+    it("skips preferredName on a generic 'Quality' field", () => {
+      const sanitized = sanitizeMappings(
+        [field(0, "Quality")],
+        [fill(0, "preferredName")]
+      );
+      expect(sanitized[0]).toMatchObject({ actionType: "skip" });
+    });
+
+    it("allows pronouns on a Pronouns field", () => {
+      const m = fill(0, "pronouns");
+      expect(sanitizeMappings([field(0, "Pronouns")], [m])).toEqual([m]);
+    });
+
+    it("allows firstName on a First Name field (regression)", () => {
+      const m = fill(0, "firstName");
+      expect(sanitizeMappings([field(0, "First Name")], [m])).toEqual([m]);
+    });
+  });
+
+  describe("LLM-generated promptText normalisation", () => {
+    it("normalises 'What's your date:?' into 'What's your Date?'", () => {
+      const sanitized = sanitizeMappings(
+        [field(0, "Date:", "date")],
+        [
+          {
+            fieldId: 0,
+            actionType: "missing",
+            profileKey: null,
+            suggestedKey: "appointmentDate",
+            promptText: "What's your date:?",
+            reason: null,
+            confidence: 1,
+          },
+        ]
+      );
+      expect(sanitized[0]?.promptText).toBe("What's your Date?");
+    });
+
+    it("leaves a clean promptText untouched", () => {
+      const m: FieldMapping = {
+        fieldId: 0,
+        actionType: "missing",
+        profileKey: null,
+        suggestedKey: "x",
+        promptText: "What's your favourite colour?",
+        reason: null,
+        confidence: 1,
+      };
+      expect(sanitizeMappings([field(0, "Colour")], [m])).toEqual([m]);
+    });
+  });
+
   it("converts mismatched profile keys into missing questions", () => {
     const sanitized = sanitizeMappings(
       [

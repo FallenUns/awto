@@ -17,6 +17,7 @@ export interface CloudCallOpts {
   anthropicApiKey: string;
   anthropicModel: string;
   signal?: AbortSignal;
+  claimedKeys?: string[];
 }
 
 const TOOL_NAME = "submit_mapping";
@@ -46,7 +47,12 @@ export async function callCloud(
         model: opts.anthropicModel,
         max_tokens: 4096,
         system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: buildUserPrompt(profile, fields) }],
+        messages: [
+          {
+            role: "user",
+            content: buildUserPrompt(profile, fields, opts.claimedKeys),
+          },
+        ],
         tools: [
           {
             name: TOOL_NAME,

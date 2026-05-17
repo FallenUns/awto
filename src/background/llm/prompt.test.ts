@@ -264,3 +264,67 @@ describe("buildUserPrompt age composite", () => {
     expect(prompt).not.toMatch(/^- age:/m);
   });
 });
+
+describe("buildUserPrompt claimedKeys hint", () => {
+  const profile: Profile = {
+    firstName: "Patrick",
+    email: "p@x.com",
+    custom: {},
+  };
+  const fields: ScannedField[] = [
+    { id: 0, selector: "#a", label: "X", placeholder: null, type: "text", required: false },
+  ];
+
+  it("includes a claimed-keys section when claimedKeys is non-empty", () => {
+    const prompt = buildUserPrompt(profile, fields, ["firstName", "email"]);
+    expect(prompt).toMatch(/keys already claimed/i);
+    expect(prompt).toContain("firstName");
+    expect(prompt).toContain("email");
+  });
+
+  it("omits the claimed-keys section when claimedKeys is empty", () => {
+    expect(buildUserPrompt(profile, fields, [])).not.toMatch(
+      /keys already claimed/i
+    );
+  });
+
+  it("omits the claimed-keys section when claimedKeys is undefined", () => {
+    expect(buildUserPrompt(profile, fields)).not.toMatch(
+      /keys already claimed/i
+    );
+  });
+});
+
+describe("SYSTEM_PROMPT hard never-rules", () => {
+  it("forbids names on non-name fields", () => {
+    expect(SYSTEM_PROMPT.toLowerCase()).toMatch(/never put a person's name/i);
+  });
+
+  it("forbids pronouns on non-pronoun fields", () => {
+    expect(SYSTEM_PROMPT.toLowerCase()).toMatch(/never put pronouns/i);
+  });
+
+  it("forbids phone numbers in account/card/id fields", () => {
+    expect(SYSTEM_PROMPT.toLowerCase()).toMatch(
+      /never put a phone number into.*(account|card|id)/is
+    );
+  });
+
+  it("instructs to skip color pickers, sliders, search, file uploads", () => {
+    const lower = SYSTEM_PROMPT.toLowerCase();
+    expect(lower).toMatch(/color picker/);
+    expect(lower).toMatch(/slider/);
+    expect(lower).toMatch(/search/);
+  });
+
+  it("instructs radio fills must exactly match an option", () => {
+    expect(SYSTEM_PROMPT.toLowerCase()).toMatch(
+      /radio.*exactly|exactly.*match.*option/i
+    );
+  });
+
+  it("prefers skip over fill below confidence 0.85", () => {
+    expect(SYSTEM_PROMPT).toMatch(/0\.85/);
+    expect(SYSTEM_PROMPT.toLowerCase()).toMatch(/prefer skip|skip over fill/);
+  });
+});

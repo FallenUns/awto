@@ -188,3 +188,105 @@ describe("Popup progressive row resolution", () => {
     expect((fillBtn as HTMLButtonElement).disabled).toBe(false);
   });
 });
+
+describe("Popup grouped sections", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  it("renders Will fill section above Review before filling section", async () => {
+    mockFlow({
+      status: "ready",
+      state: {
+        loadingFields: [],
+        fillRows: [
+          { fieldId: 0, selector: "#a", label: "First name", profileKey: "firstName", resolvedValue: "Patrick", confidence: 1 },
+          { fieldId: 1, selector: "#b", label: "Account", profileKey: "phone", resolvedValue: "0400 000 000", confidence: 0.7 },
+        ],
+      },
+    });
+    const { Popup: PopupDyn } = await import("./Popup");
+    const { render: renderDyn } = await import("@testing-library/react");
+    const { container } = renderDyn(<PopupDyn />);
+    const headers = container.querySelectorAll(".awto-section-header__label");
+    const labels = Array.from(headers).map((h) => h.textContent);
+    expect(labels[0]).toBe("Will fill");
+    expect(labels[1]).toBe("Review before filling");
+  });
+
+  it("low-confidence fills land in Review, not Will fill (ActionBar count excludes them)", async () => {
+    mockFlow({
+      status: "ready",
+      state: {
+        loadingFields: [],
+        fillRows: [
+          { fieldId: 0, selector: "#a", label: "First name", profileKey: "firstName", resolvedValue: "Patrick", confidence: 1 },
+          { fieldId: 1, selector: "#b", label: "Account", profileKey: "phone", resolvedValue: "0400 000 000", confidence: 0.7 },
+        ],
+      },
+    });
+    const { Popup: PopupDyn } = await import("./Popup");
+    const { render: renderDyn, screen: screenDyn } = await import("@testing-library/react");
+    renderDyn(<PopupDyn />);
+    const fillBtn = screenDyn.getByRole("button", { name: /fill 1 field/i });
+    expect((fillBtn as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("clicking Use on a Review row promotes it into Will fill (count goes up)", async () => {
+    mockFlow({
+      status: "ready",
+      state: {
+        loadingFields: [],
+        fillRows: [
+          { fieldId: 0, selector: "#a", label: "First name", profileKey: "firstName", resolvedValue: "Patrick", confidence: 1 },
+          { fieldId: 1, selector: "#b", label: "Account", profileKey: "phone", resolvedValue: "0400 000 000", confidence: 0.7 },
+        ],
+      },
+    });
+    const { Popup: PopupDyn } = await import("./Popup");
+    const { render: renderDyn, screen: screenDyn, fireEvent } = await import("@testing-library/react");
+    renderDyn(<PopupDyn />);
+    expect(screenDyn.getByRole("button", { name: /fill 1 field/i })).toBeTruthy();
+    const useBtn = screenDyn.getByRole("button", { name: /use 0400 000 000/i });
+    fireEvent.click(useBtn);
+    expect(screenDyn.getByRole("button", { name: /fill 2 fields/i })).toBeTruthy();
+  });
+
+  it("Skipped section is collapsed by default and expands on click", async () => {
+    mockFlow({
+      status: "ready",
+      state: {
+        loadingFields: [],
+        skippedRows: [
+          { fieldId: 0, label: "Slider", reason: "Cannot fill slider" },
+          { fieldId: 1, label: "Color", reason: "Cannot fill color picker" },
+        ],
+      },
+    });
+    const { Popup: PopupDyn } = await import("./Popup");
+    const { render: renderDyn, screen: screenDyn, fireEvent } = await import("@testing-library/react");
+    renderDyn(<PopupDyn />);
+    expect(document.querySelectorAll(".awto-fieldrow--skip")).toHaveLength(0);
+    const header = screenDyn.getByRole("button", { name: /skipped/i });
+    fireEvent.click(header);
+    expect(document.querySelectorAll(".awto-fieldrow--skip")).toHaveLength(2);
+  });
+
+  it("hides section headers whose count is zero", async () => {
+    mockFlow({
+      status: "ready",
+      state: {
+        loadingFields: [],
+        fillRows: [
+          { fieldId: 0, selector: "#a", label: "First name", profileKey: "firstName", resolvedValue: "Patrick", confidence: 1 },
+        ],
+      },
+    });
+    const { Popup: PopupDyn } = await import("./Popup");
+    const { render: renderDyn } = await import("@testing-library/react");
+    renderDyn(<PopupDyn />);
+    const headers = document.querySelectorAll(".awto-section-header__label");
+    const labels = Array.from(headers).map((h) => h.textContent);
+    expect(labels).toEqual(["Will fill"]);
+  });
+});

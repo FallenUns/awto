@@ -1,9 +1,13 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, AlertCircle, FileX2 } from "lucide-react";
 import { Header } from "./Header";
 import { FieldRow } from "./FieldRow";
 import { ActionBar } from "./ActionBar";
+import { SectionHeader } from "./SectionHeader";
 import { useAwtoFlow } from "./useAwtoFlow";
+import type { FillRow } from "./types";
+
+const REVIEW_THRESHOLD = 0.85;
 
 export function formatFailureReason(reason: string): string {
   switch (reason) {
@@ -26,29 +30,54 @@ export function Popup() {
   const { state, status, setMissingValue, fill, retry, cancel, rescan } =
     useAwtoFlow();
   const listRef = useRef<HTMLDivElement>(null);
+  const [promoted, setPromoted] = useState<Set<number>>(new Set());
+  const [skippedCollapsed, setSkippedCollapsed] = useState(true);
 
   useEffect(() => {
     if (listRef.current) listRef.current.scrollTop = 0;
   }, [status]);
 
-  const fillCount = state.fillRows.length;
-  const missingCount = state.missingRows.length;
-  const skipCount = state.skippedRows.length;
+  const isMappingOrReady =
+    status === "mapping" || status === "ready" || status === "filling";
+
+  const { willFill, review } = useMemo(() => {
+    const willFill: FillRow[] = [];
+    const review: FillRow[] = [];
+    for (const row of state.fillRows) {
+      if (row.confidence >= REVIEW_THRESHOLD || promoted.has(row.fieldId)) {
+        willFill.push(row);
+      } else {
+        review.push(row);
+      }
+    }
+    return { willFill, review };
+  }, [state.fillRows, promoted]);
+
   const answeredMissing = state.missingRows.filter(
     (r) => r.userValue.trim() !== ""
   ).length;
-  const totalToFill = fillCount + answeredMissing;
-  const fillDisabled =
-    fillCount === 0 &&
-    state.missingRows.every((r) => r.userValue.trim() === "");
-  const isMappingOrReady =
-    status === "mapping" || status === "ready" || status === "filling";
+  const totalToFill = willFill.length + answeredMissing;
+  const missingCount = state.missingRows.length;
+  const skipCount = state.skippedRows.length;
+  const fillDisabled = totalToFill === 0;
+
+  const resolvedIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const r of state.fillRows) ids.add(r.fieldId);
+    for (const r of state.missingRows) ids.add(r.fieldId);
+    for (const r of state.skippedRows) ids.add(r.fieldId);
+    return ids;
+  }, [state.fillRows, state.missingRows, state.skippedRows]);
+
+  const pendingFields = state.loadingFields.filter(
+    (f) => !resolvedIds.has(f.id)
+  );
 
   return (
     <div className="awto-popup">
       <Header
         status={status}
-        readyCount={fillCount}
+        readyCount={willFill.length}
         missingCount={missingCount}
         skipCount={skipCount}
         chunksDone={state.chunksCompleted}
@@ -61,89 +90,109 @@ export function Popup() {
           <FieldRow kind="loading" fieldId={-1} label="Scanning the form…" />
         )}
 
-        {isMappingOrReady && state.loadingFields.length > 0 &&
-          state.loadingFields.map((f) => {
-            const fill = state.fillRows.find((r) => r.fieldId === f.id);
-            if (fill) {
-              return (
-                <FieldRow
-                  key={`fill-${f.id}`}
-                  kind="fill"
-                  fieldId={f.id}
-                  label={fill.label}
-                  value={fill.resolvedValue}
-                  confidence={fill.confidence}
-                />
-              );
-            }
-            const missing = state.missingRows.find((r) => r.fieldId === f.id);
-            if (missing) {
-              return (
-                <FieldRow
-                  key={`missing-${f.id}`}
-                  kind="missing"
-                  fieldId={f.id}
-                  label={missing.label}
-                  value={missing.userValue}
-                  promptText={missing.promptText}
-                  onChangeValue={(v) => setMissingValue(f.id, v)}
-                />
-              );
-            }
-            const skip = state.skippedRows.find((r) => r.fieldId === f.id);
-            if (skip) {
-              return (
-                <FieldRow
-                  key={`skip-${f.id}`}
-                  kind="skip"
-                  fieldId={f.id}
-                  label={skip.label}
-                  reason={skip.reason}
-                />
-              );
-            }
-            return (
-              <FieldRow
-                key={`loading-${f.id}`}
-                kind="loading"
-                fieldId={f.id}
-                label={f.label || `Field ${f.id}`}
-              />
-            );
-          })}
-
-        {isMappingOrReady && state.loadingFields.length === 0 && (
+        {isMappingOrReady && (
           <>
-            {state.fillRows.map((r) => (
-              <FieldRow
-                key={`fill-${r.fieldId}`}
-                kind="fill"
-                fieldId={r.fieldId}
-                label={r.label}
-                value={r.resolvedValue}
-                confidence={r.confidence}
-              />
-            ))}
-            {state.missingRows.map((r) => (
-              <FieldRow
-                key={`missing-${r.fieldId}`}
-                kind="missing"
-                fieldId={r.fieldId}
-                label={r.label}
-                value={r.userValue}
-                promptText={r.promptText}
-                onChangeValue={(v) => setMissingValue(r.fieldId, v)}
-              />
-            ))}
-            {state.skippedRows.map((r) => (
-              <FieldRow
-                key={`skip-${r.fieldId}`}
-                kind="skip"
-                fieldId={r.fieldId}
-                label={r.label}
-                reason={r.reason}
-              />
-            ))}
+            {willFill.length > 0 && (
+              <>
+                <SectionHeader
+                  label="Will fill"
+                  count={willFill.length}
+                  tone="neutral"
+                />
+                {willFill.map((r) => (
+                  <FieldRow
+                    key={`fill-${r.fieldId}`}
+                    kind="fill"
+                    fieldId={r.fieldId}
+                    label={r.label}
+                    value={r.resolvedValue}
+                    confidence={r.confidence}
+                  />
+                ))}
+              </>
+            )}
+
+            {review.length > 0 && (
+              <>
+                <SectionHeader
+                  label="Review before filling"
+                  count={review.length}
+                  tone="amber"
+                />
+                {review.map((r) => (
+                  <FieldRow
+                    key={`review-${r.fieldId}`}
+                    kind="fill"
+                    fieldId={r.fieldId}
+                    label={r.label}
+                    value={r.resolvedValue}
+                    confidence={r.confidence}
+                    reviewable
+                    onUse={() =>
+                      setPromoted((prev) => {
+                        const next = new Set(prev);
+                        next.add(r.fieldId);
+                        return next;
+                      })
+                    }
+                  />
+                ))}
+              </>
+            )}
+
+            {missingCount > 0 && (
+              <>
+                <SectionHeader
+                  label="Needs your input"
+                  count={missingCount}
+                  tone="amber"
+                />
+                {state.missingRows.map((r) => (
+                  <FieldRow
+                    key={`missing-${r.fieldId}`}
+                    kind="missing"
+                    fieldId={r.fieldId}
+                    label={r.label}
+                    value={r.userValue}
+                    promptText={r.promptText}
+                    onChangeValue={(v) => setMissingValue(r.fieldId, v)}
+                  />
+                ))}
+              </>
+            )}
+
+            {pendingFields.length > 0 &&
+              pendingFields.map((f) => (
+                <FieldRow
+                  key={`loading-${f.id}`}
+                  kind="loading"
+                  fieldId={f.id}
+                  label={f.label || `Field ${f.id}`}
+                />
+              ))}
+
+            {skipCount > 0 && (
+              <>
+                <SectionHeader
+                  label="Skipped"
+                  count={skipCount}
+                  tone="muted"
+                  collapsible
+                  collapsed={skippedCollapsed}
+                  onToggle={() => setSkippedCollapsed((v) => !v)}
+                />
+                {!skippedCollapsed &&
+                  state.skippedRows.map((r) => (
+                    <FieldRow
+                      key={`skip-${r.fieldId}`}
+                      kind="skip"
+                      fieldId={r.fieldId}
+                      label={r.label}
+                      reason={r.reason}
+                    />
+                  ))}
+              </>
+            )}
           </>
         )}
 

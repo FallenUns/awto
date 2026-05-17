@@ -41,6 +41,16 @@ When the form has a single name-style field labeled "Name", "Full name", "Custom
 
 For street address fields: if the form has a SEPARATE field labeled "Unit", "Apt", "Apartment", "Suite", "#", or has autocomplete="address-line2", map that field to "unitNumber". If the form has only ONE street-address field and the profile has unitNumber set, use "addressLine1WithUnit" (the composed "unit/street" string) — do NOT use just "addressLine1" alone in that case.
 
+Hard never-rules — these override everything else:
+
+- NEVER put a person's name (firstName, lastName, fullName, preferredName, middleName) into a field whose label does NOT contain a name-related word (name, applicant, passenger, customer, contact, given, family, surname). For "Color picker", "Search", "Quality", "Fruit", "Filter", "Quantity", "Account", "Account #", "Description", "Answer", or other generic non-personal labels — SKIP.
+- NEVER put pronouns into a field whose label does NOT mention pronouns. "Color picker", "Search", "Female" radio — all SKIP.
+- NEVER put a phone number into a field labelled "Account", "Account #", "Account Number", "Card", "ID", "Code", or similar non-phone labels. Phones only go into phone-labelled fields.
+- NEVER fill a color picker, slider, search input, or file upload. SKIP these with confidence 1.0.
+- For checkboxes representing colour/food/preference choices (Red, Green, Blue, Pizza, Burger): SKIP. Only fill consent/agreement checkboxes when the profile has an explicit boolean for that consent.
+- For radio groups: only fill if the profile value EXACTLY matches one of the radio's options (case-insensitive). The string "he/him" does NOT match a "Female" radio option. SKIP if no exact match.
+- If your confidence in a fill is below 0.85, prefer SKIP over fill. Wrong fills are worse than empty fields — the user can always type a value, but they cannot easily undo a wrong value on tax/insurance/government forms.
+
 Rules:
 - "profileKey" MUST be one of the profile keys listed in the user prompt. Never invent profile keys for "fill".
 - Use the profile VALUES as semantic hints (e.g. an email-looking value matches an <input type="email">).
@@ -48,7 +58,8 @@ Rules:
 
 export function buildUserPrompt(
   profile: Profile,
-  fields: ScannedField[]
+  fields: ScannedField[],
+  claimedKeys?: string[]
 ): string {
   const keys = profileKeys(profile);
   const profileLines = keys.map((key) => {
@@ -102,7 +113,12 @@ export function buildUserPrompt(
       ? `Form fields:\n${fieldLines.join("\n")}`
       : "Form fields:\n(no fields)";
 
-  return `${profileSection}\n\n${fieldSection}\n\nReturn a single JSON object with a "mappings" array — one entry per field — strictly matching the provided JSON schema.`;
+  const claimedSection =
+    claimedKeys && claimedKeys.length > 0
+      ? `\n\nKeys already claimed by parser-resolved fields on this form: [${claimedKeys.join(", ")}]\nAvoid reusing these keys for other fields unless the new field clearly asks for the same data.`
+      : "";
+
+  return `${profileSection}\n\n${fieldSection}${claimedSection}\n\nReturn a single JSON object with a "mappings" array — one entry per field — strictly matching the provided JSON schema.`;
 }
 
 export function getOutputJsonSchema(): Record<string, unknown> {

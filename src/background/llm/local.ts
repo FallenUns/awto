@@ -17,6 +17,7 @@ export interface LocalCallOpts {
   ollamaModel: string;
   timeoutMs?: number;
   signal?: AbortSignal;
+  claimedKeys?: string[];
 }
 
 function joinUrl(base: string, path: string): string {
@@ -37,7 +38,7 @@ export async function callLocal(
     format: getOutputJsonSchema(),
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: buildUserPrompt(profile, fields) },
+      { role: "user", content: buildUserPrompt(profile, fields, opts.claimedKeys) },
     ],
     options: { temperature: 0 },
   };

@@ -1,10 +1,23 @@
 import type { FieldMapping } from "@/shared/mapping";
 import type { ScannedField } from "@/shared/messages";
+import { phrasePrompt } from "./rule-mapper";
 
 type Decision =
   | { kind: "allow" }
   | { kind: "skip"; reason: string }
   | { kind: "missing"; suggestedKey: string; promptText: string };
+
+const REQUIRE_LABEL_MATCH: Record<string, string[]> = {
+  firstName: ["firstName", "fullName"],
+  lastName: ["lastName", "fullName"],
+  middleName: ["middleName", "fullName"],
+  preferredName: ["preferredName", "fullName"],
+  fullName: ["fullName"],
+  pronouns: ["pronouns"],
+  gender: ["gender"],
+  phone: ["phone", "mobilePhone"],
+  mobilePhone: ["phone", "mobilePhone"],
+};
 
 interface IntentRule {
   patterns: RegExp[];
@@ -79,6 +92,7 @@ const INTENT_RULES: IntentRule[] = [
   { patterns: [/\be\s*mail\b/, /\bemail\b/], allow: ["email", "secondaryEmail"], suggestedKey: "email" },
   { patterns: [/\bweb\s*site\b/, /\bwebsite\b/, /\burl\b/], allow: ["website", "linkedIn", "github"] },
   { patterns: [/\bsex\b/, /\bgender\b/], allow: ["gender"] },
+  { patterns: [/\bpronouns?\b/], allow: ["pronouns"] },
   { patterns: [/\bdriver\s*licen[cs]e\b/], allow: ["driverLicense"] },
   { patterns: [/\bdate\s*of\s*birth\b/, /\bbirth\s*date\b/, /\bdob\b/, /\bbirthday\b/], allow: ["dateOfBirth"] },
 ];
@@ -90,12 +104,16 @@ export function sanitizeMappings(
   const fieldsById = new Map(fields.map((field) => [field.id, field]));
 
   return mappings.map((mapping) => {
+    const field = fieldsById.get(mapping.fieldId);
+    if (!field) return mapping;
+
+    if (mapping.actionType === "missing") {
+      return normaliseMissing(field, mapping);
+    }
+
     if (mapping.actionType !== "fill" || !mapping.profileKey) {
       return mapping;
     }
-
-    const field = fieldsById.get(mapping.fieldId);
-    if (!field) return mapping;
 
     const decision = decide(field, mapping.profileKey);
     if (decision.kind === "allow") return mapping;
@@ -110,19 +128,22 @@ function decide(field: ScannedField, profileKey: string): Decision {
   }
 
   const signal = fieldSignal(field);
-  if (!signal) return { kind: "allow" };
 
-  for (const rule of INTENT_RULES) {
-    if (!rule.patterns.some((pattern) => pattern.test(signal))) continue;
-    if (rule.skipReason) return { kind: "skip", reason: rule.skipReason };
-    if (rule.allow?.includes(profileKey)) return { kind: "allow" };
+  let matched = false;
+  if (signal) {
+    for (const rule of INTENT_RULES) {
+      if (!rule.patterns.some((pattern) => pattern.test(signal))) continue;
+      matched = true;
+      if (rule.skipReason) return { kind: "skip", reason: rule.skipReason };
+      if (rule.allow?.includes(profileKey)) return { kind: "allow" };
 
-    const key = rule.suggestedKey ?? suggestedKey(field);
-    return {
-      kind: "missing",
-      suggestedKey: key,
-      promptText: promptText(field, key),
-    };
+      const key = rule.suggestedKey ?? suggestedKey(field);
+      return {
+        kind: "missing",
+        suggestedKey: key,
+        promptText: promptText(field, key),
+      };
+    }
   }
 
   if (profileKey === "dateOfBirth") {
@@ -133,7 +154,30 @@ function decide(field: ScannedField, profileKey: string): Decision {
     };
   }
 
+  const requiredAllow = REQUIRE_LABEL_MATCH[profileKey];
+  if (requiredAllow && !matched) {
+    return {
+      kind: "skip",
+      reason: "Profile value doesn't fit this field — skipped",
+    };
+  }
+
   return { kind: "allow" };
+}
+
+function normaliseMissing(
+  field: ScannedField,
+  mapping: FieldMapping
+): FieldMapping {
+  const text = mapping.promptText ?? "";
+  const looksMalformed = /:\s*\?/.test(text) || text.endsWith(":") || text === "";
+  if (!looksMalformed) return mapping;
+
+  const fallbackKey = mapping.suggestedKey ?? "answer";
+  return {
+    ...mapping,
+    promptText: phrasePrompt(field.label, fallbackKey),
+  };
 }
 
 function suggestedKey(field: ScannedField): string {

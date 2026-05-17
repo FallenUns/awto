@@ -13,6 +13,7 @@ export interface HybridCallOpts {
   cloudFallbackEnabled: boolean;
   confidenceThreshold: number;
   signal?: AbortSignal;
+  claimedKeys?: string[];
 }
 
 export interface HybridResult {
@@ -60,11 +61,13 @@ export async function callHybrid(
     ollamaModel: opts.ollamaModel,
     timeoutMs: opts.ollamaTimeoutMs,
     signal: opts.signal,
+    claimedKeys: opts.claimedKeys,
   };
   const cloudOpts: CloudCallOpts = {
     anthropicApiKey: opts.anthropicApiKey,
     anthropicModel: opts.anthropicModel,
     signal: opts.signal,
+    claimedKeys: opts.claimedKeys,
   };
 
   let localResponse: LLMResponse | null = null;

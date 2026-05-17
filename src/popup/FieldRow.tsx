@@ -11,7 +11,9 @@ interface FieldRowProps {
   promptText?: string;
   reason?: string;
   confidence?: number;
+  reviewable?: boolean;
   onChangeValue?: (value: string) => void;
+  onUse?: () => void;
 }
 
 export function FieldRow({
@@ -22,13 +24,19 @@ export function FieldRow({
   promptText,
   reason,
   confidence,
+  reviewable = false,
   onChangeValue,
+  onUse,
 }: FieldRowProps) {
   const inputId = `field-${fieldId}`;
   const lowConfidence = kind === "fill" && confidence !== undefined && confidence < 0.85;
 
   return (
-    <div className={`awto-fieldrow awto-fieldrow--${kind}`}>
+    <div
+      className={`awto-fieldrow awto-fieldrow--${kind}${
+        reviewable ? " awto-fieldrow--reviewable" : ""
+      }`}
+    >
       <span className="awto-fieldrow__icon" aria-hidden="true">
         {iconFor(kind)}
       </span>
@@ -42,7 +50,19 @@ export function FieldRow({
         )}
         {label}
       </label>
-      <div className="awto-fieldrow__value">{renderValue(kind, value, promptText, reason, inputId, onChangeValue)}</div>
+      <div className="awto-fieldrow__value">
+        {renderValue(kind, value, promptText, reason, inputId, onChangeValue)}
+        {reviewable && onUse && (
+          <button
+            type="button"
+            className="awto-fieldrow__use"
+            onClick={onUse}
+            aria-label={`Use ${value} for ${label}`}
+          >
+            Use
+          </button>
+        )}
+      </div>
     </div>
   );
 }

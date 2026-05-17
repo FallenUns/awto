@@ -234,6 +234,109 @@ input {
   text-align: right;
 }
 
+/* ---------- Section headers ---------- */
+
+.awto-section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--color-foreground);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: left;
+  cursor: default;
+}
+
+button.awto-section-header {
+  cursor: pointer;
+  transition: background 150ms ease-out;
+}
+
+button.awto-section-header:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+button.awto-section-header:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.awto-section-header--neutral {
+  color: var(--color-accent);
+  border-left: 3px solid var(--color-accent);
+}
+
+.awto-section-header--amber {
+  color: #F59E0B;
+  border-left: 3px solid #F59E0B;
+}
+
+.awto-section-header--muted {
+  color: var(--color-foreground);
+  opacity: 0.55;
+  border-left: 3px solid var(--color-border);
+}
+
+.awto-section-header__label {
+  flex: 1;
+}
+
+.awto-section-header__count {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 11px;
+}
+
+.awto-section-header__chevron {
+  transition: transform 150ms ease-out;
+}
+
+.awto-section-header__chevron--open {
+  transform: rotate(90deg);
+}
+
+/* ---------- Review-row Use button ---------- */
+
+.awto-fieldrow--reviewable .awto-fieldrow__value-text {
+  opacity: 0.7;
+}
+
+.awto-fieldrow__use {
+  margin-left: 8px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--color-accent);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-accent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease-out, color 150ms ease-out;
+}
+
+.awto-fieldrow__use:hover {
+  background: var(--color-accent);
+  color: #052e16;
+}
+
+.awto-fieldrow__use:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 /* ---------- Shimmer (loading rows) ---------- */
 
 .awto-shimmer {

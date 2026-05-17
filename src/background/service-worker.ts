@@ -63,6 +63,15 @@ export async function handleMessage(
       // Existing prefilter on the remaining set (checkboxes/radios → skip)
       const { toLLM, skipped: preSkipped } = prefilter(remaining, message.profile);
 
+      // Keys that the parser has already claimed — hint to the LLM not to reuse.
+      const claimedKeys = Array.from(
+        new Set(
+          ruleMappings
+            .filter((m) => m.actionType === "fill" && m.profileKey)
+            .map((m) => m.profileKey as string)
+        )
+      );
+
       // Stream initial deterministic mappings to the popup if there's a port
       if (deps._port && ruleMappings.length + preSkipped.length > 0) {
         const initial = [...ruleMappings, ...preSkipped].sort(
@@ -85,7 +94,7 @@ export async function handleMessage(
             const result = await hybrid(
               message.profile,
               chunk,
-              { ...settings, signal: deps.signal }
+              { ...settings, signal: deps.signal, claimedKeys }
             );
             const sanitized = sanitizeMappings(chunk, result.response.mappings);
             llmMappings.push(...sanitized);
