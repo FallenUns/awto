@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { scanFields } from "./form-scanner";
+
+(globalThis as unknown as { chrome: unknown }).chrome = {
+  storage: {
+    local: { get: () => Promise.resolve({}) },
+    onChanged: { addListener: () => {} },
+  },
+};
+
+const { scanFields } = await import("./form-scanner");
 
 function setBody(html: string): void {
   document.body.innerHTML = html;
@@ -532,6 +540,40 @@ describe("scanFields", () => {
       `);
       const fields = scanFields(document);
       expect(fields.map((f) => f.selector)).toEqual(["#email"]);
+    });
+  });
+
+  describe("ARIA radiogroup", () => {
+    it("scans a Google Forms-style radiogroup with aria-labelledby", () => {
+      document.body.innerHTML = `
+        <main>
+          <div id="lbl-age" role="heading">Usia *</div>
+          <div role="radiogroup" aria-labelledby="lbl-age" data-params="%.@.[1234567890,&quot;Usia&quot;]">
+            <div role="radio" data-value="<17">&lt;17</div>
+            <div role="radio" data-value="17-21">17-21</div>
+            <div role="radio" data-value="22-30">22-30</div>
+          </div>
+        </main>
+      `;
+      const fields = scanFields();
+      expect(fields).toHaveLength(1);
+      expect(fields[0]).toMatchObject({
+        label: "Usia *",
+        type: "radio",
+        options: ["<17", "17-21", "22-30"],
+      });
+    });
+
+    it("uses an aria-labelledby selector when no id is present on the widget", () => {
+      document.body.innerHTML = `
+        <div id="lbl-pendidikan">Pendidikan</div>
+        <div role="radiogroup" aria-labelledby="lbl-pendidikan">
+          <div role="radio">SMA/SMK</div>
+          <div role="radio">Diploma</div>
+        </div>
+      `;
+      const fields = scanFields();
+      expect(fields[0]?.selector).toBe('[aria-labelledby="lbl-pendidikan"]');
     });
   });
 });

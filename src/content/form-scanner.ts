@@ -1,4 +1,5 @@
 import type { ScannedField } from "@/shared/messages";
+import { isAriaScanEnabled } from "./aria-settings";
 
 const TEXT_LIKE_TYPES = new Set([
   "text",
@@ -94,6 +95,35 @@ export function scanFields(
     }
 
     fields.push(field);
+  }
+
+  if (isAriaScanEnabled()) {
+    const nativeElements = new Set<Element>(
+      candidates.filter((c) => isEligible(c))
+    );
+    const radiogroups = Array.from(
+      root.querySelectorAll<HTMLElement>('[role="radiogroup"]')
+    );
+    for (const group of radiogroups) {
+      if (containsAny(group, nativeElements)) continue;
+      if (isHidden(group)) continue;
+      if (group.getAttribute("aria-disabled") === "true") continue;
+      const options = Array.from(
+        group.querySelectorAll<HTMLElement>('[role="radio"]')
+      )
+        .map((r) => (r.textContent ?? "").trim())
+        .filter((t) => t.length > 0);
+      if (options.length === 0) continue;
+      fields.push({
+        id: nextId++,
+        selector: buildAriaSelector(group, ownerDoc),
+        label: extractAriaLabel(group, ownerDoc),
+        placeholder: null,
+        type: "radio",
+        required: group.getAttribute("aria-required") === "true",
+        options,
+      });
+    }
   }
 
   return fields;
@@ -436,4 +466,54 @@ function isFillableElement(el: Element): boolean {
 
 function hasUsableRect(rect: DOMRect): boolean {
   return rect.width > 0 && rect.height > 0;
+}
+
+function containsAny(parent: Element, candidates: Set<Element>): boolean {
+  for (const c of candidates) {
+    if (parent.contains(c)) return true;
+  }
+  return false;
+}
+
+function buildAriaSelector(el: HTMLElement, doc: Document): string {
+  const id = el.id;
+  if (id && isSimpleId(id) && doc.querySelectorAll(`#${cssEscape(id)}`).length === 1) {
+    return `#${cssEscape(id)}`;
+  }
+  const dataParams = el.getAttribute("data-params");
+  if (dataParams) {
+    const escaped = dataParams.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    const sel = `[data-params="${escaped}"]`;
+    if (matchesOne(doc, sel)) return sel;
+  }
+  const labelledBy = el.getAttribute("aria-labelledby");
+  if (labelledBy) {
+    const sel = `[aria-labelledby="${cssEscape(labelledBy)}"]`;
+    if (matchesOne(doc, sel)) return sel;
+  }
+  return buildNthSelector(el);
+}
+
+function matchesOne(doc: Document, selector: string): boolean {
+  try {
+    return doc.querySelectorAll(selector).length === 1;
+  } catch {
+    return false;
+  }
+}
+
+function extractAriaLabel(el: HTMLElement, doc: Document): string {
+  const labelledBy = el.getAttribute("aria-labelledby");
+  if (labelledBy) {
+    const ids = labelledBy.split(/\s+/).filter(Boolean);
+    const text = ids
+      .map((id) => doc.getElementById(id)?.textContent?.trim() ?? "")
+      .filter((s) => s.length > 0)
+      .join(" ")
+      .trim();
+    if (text) return text;
+  }
+  const ariaLabel = el.getAttribute("aria-label");
+  if (ariaLabel && ariaLabel.trim()) return ariaLabel.trim();
+  return nearestPrecedingText(el);
 }

@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { startDetector } from "./detector";
+
+(globalThis as unknown as { chrome: unknown }).chrome = {
+  storage: {
+    local: { get: () => Promise.resolve({}) },
+    onChanged: { addListener: () => {} },
+  },
+};
+
+const { startDetector } = await import("./detector");
 
 describe("startDetector", () => {
   beforeEach(() => {
