@@ -21,10 +21,23 @@ chrome.runtime.onMessage.addListener(
     if (message.type === "scanForm") {
       sendResponse({ type: "scanFormResult", fields: scanFields(document) });
     } else if (message.type === "fillForm") {
-      void fillFields(document, message.values).then((result) => {
-        sendResponse({ type: "fillFormResult", ...result });
-        widget.setHidden("filled");
-      });
+      fillFields(document, message.values)
+        .then((result) => {
+          sendResponse({ type: "fillFormResult", ...result });
+          widget.setHidden("filled");
+        })
+        .catch((err: unknown) => {
+          sendResponse({
+            type: "fillFormResult",
+            filled: 0,
+            failed: [
+              {
+                selector: "*",
+                reason: err instanceof Error ? err.message : String(err),
+              },
+            ],
+          });
+        });
     }
     return true;
   }
