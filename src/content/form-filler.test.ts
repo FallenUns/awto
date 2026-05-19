@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { fillFields, fillAriaWidget } from "./form-filler";
+import { fillFields, fillAriaWidget, matchAriaOption } from "./form-filler";
 
 function setBody(html: string): void {
   document.body.innerHTML = html;
@@ -465,5 +465,89 @@ describe("fillAriaWidget — unsupported role", () => {
       filled: false,
       reason: "unsupported aria role",
     });
+  });
+});
+
+describe("matchAriaOption", () => {
+  it("does not match Female to Male (substring hazard)", () => {
+    expect(matchAriaOption("Female", "Male")).toBe(false);
+  });
+
+  it("matches Yes to Yesterday (legitimate prefix match)", () => {
+    expect(matchAriaOption("Yes", "Yesterday")).toBe(true);
+  });
+
+  it("matches VIC to Victoria (3-char prefix match)", () => {
+    expect(matchAriaOption("VIC", "Victoria")).toBe(true);
+  });
+
+  it("matches Victoria to VIC (3-char prefix match, reversed args)", () => {
+    expect(matchAriaOption("Victoria", "VIC")).toBe(true);
+  });
+
+  it("does not match au to Australia (under 3-char threshold)", () => {
+    expect(matchAriaOption("au", "Australia")).toBe(false);
+  });
+});
+
+describe("fillAriaWidget — combobox with portal options", () => {
+  it("clicks the combobox, waits a frame, then clicks the matching option in the document", async () => {
+    document.body.innerHTML = `
+      <div id="c" role="combobox" aria-expanded="false"></div>
+      <div id="popup" style="display:none">
+        <div role="option">Victoria</div>
+        <div role="option">New South Wales</div>
+      </div>
+    `;
+    const combobox = document.getElementById("c") as HTMLElement;
+    const popup = document.getElementById("popup") as HTMLElement;
+    combobox.addEventListener("click", () => {
+      popup.style.display = "block";
+      combobox.setAttribute("aria-expanded", "true");
+    });
+    let optionClicked = "";
+    popup.querySelectorAll<HTMLElement>('[role="option"]').forEach((o) => {
+      o.addEventListener("click", () => {
+        optionClicked = o.textContent ?? "";
+      });
+    });
+
+    const result = await fillAriaWidget(combobox, "Victoria");
+
+    expect(result).toMatchObject({ filled: true });
+    expect(optionClicked).toBe("Victoria");
+  });
+
+  it("returns no matching option when no option matches after opening", async () => {
+    document.body.innerHTML = `
+      <div id="c" role="combobox"></div>
+      <div role="option">Australia</div>
+    `;
+    const result = await fillAriaWidget(
+      document.getElementById("c") as HTMLElement,
+      "Mars"
+    );
+    expect(result).toMatchObject({ filled: false, reason: "no matching option" });
+  });
+
+  it("also handles top-level role=listbox", async () => {
+    document.body.innerHTML = `
+      <div id="l" role="listbox">
+        <div role="option">Yes</div>
+        <div role="option">No</div>
+      </div>
+    `;
+    let clicked = "";
+    document.querySelectorAll<HTMLElement>('[role="option"]').forEach((o) => {
+      o.addEventListener("click", () => {
+        clicked = o.textContent ?? "";
+      });
+    });
+    const result = await fillAriaWidget(
+      document.getElementById("l") as HTMLElement,
+      "No"
+    );
+    expect(result).toMatchObject({ filled: true });
+    expect(clicked).toBe("No");
   });
 });

@@ -130,6 +130,9 @@ export async function fillAriaWidget(
       return fillAriaRadioGroup(el, value);
     case "checkbox":
       return fillAriaCheckbox(el, value);
+    case "combobox":
+    case "listbox":
+      return fillAriaListbox(el, value);
     default:
       return { filled: false, reason: "unsupported aria role" };
   }
@@ -184,13 +187,60 @@ function fillAriaCheckbox(
   return { filled: true };
 }
 
-function matchAriaOption(needle: string, haystack: string): boolean {
+async function fillAriaListbox(
+  el: HTMLElement,
+  value: string
+): Promise<{ filled: boolean; reason?: string }> {
+  el.click();
+  await waitFrame();
+  const options = Array.from(
+    document.querySelectorAll<HTMLElement>('[role="option"]')
+  ).filter((o) => !isVisuallyHidden(o));
+  const exact = options.find(
+    (o) =>
+      (o.textContent ?? "").trim().toLowerCase() ===
+      value.trim().toLowerCase()
+  );
+  const match =
+    exact ??
+    options.find((o) =>
+      matchAriaOption(value, (o.textContent ?? "").trim())
+    );
+  if (!match) {
+    el.click();
+    return { filled: false, reason: "no matching option" };
+  }
+  match.click();
+  return { filled: true };
+}
+
+function waitFrame(): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => resolve());
+    } else {
+      setTimeout(resolve, 0);
+    }
+  });
+}
+
+function isVisuallyHidden(el: HTMLElement): boolean {
+  const style = el.style;
+  if (style && (style.display === "none" || style.visibility === "hidden")) {
+    return true;
+  }
+  return false;
+}
+
+export function matchAriaOption(needle: string, haystack: string): boolean {
   const n = needle.trim().toLowerCase();
   const h = haystack.trim().toLowerCase();
   if (!n || !h) return false;
   if (n === h) return true;
-  if (h.includes(n) || n.includes(h)) return true;
-  return false;
+  const shorter = n.length <= h.length ? n : h;
+  const longer = n.length <= h.length ? h : n;
+  if (shorter.length < 3) return false;
+  return longer.startsWith(shorter);
 }
 
 function isSemanticallyUnsafeFill(
