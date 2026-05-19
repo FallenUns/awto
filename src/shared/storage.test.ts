@@ -175,3 +175,25 @@ describe("saveLLMSettings", () => {
     errorSpy.mockRestore();
   });
 });
+
+describe("LLMSettings.enableAriaForms", () => {
+  let local: StorageMock;
+
+  beforeEach(() => {
+    local = installChromeMock();
+  });
+
+  it("defaults to true when missing from storage", async () => {
+    local.get.mockResolvedValue({});
+    const settings = await loadLLMSettings();
+    expect(settings.enableAriaForms).toBe(true);
+  });
+
+  it("round-trips a false value", async () => {
+    local.get.mockResolvedValue({
+      "awto:llm": { enableAriaForms: false },
+    });
+    const settings = await loadLLMSettings();
+    expect(settings.enableAriaForms).toBe(false);
+  });
+});

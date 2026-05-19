@@ -13,6 +13,7 @@ export const LLMSettingsSchema = z.object({
   anthropicApiKey: z.string().default(""),
   anthropicModel: z.string().default("claude-opus-4-7"),
   cloudFallbackEnabled: z.boolean().default(true),
+  enableAriaForms: z.boolean().default(true),
   confidenceThreshold: z.number().min(0).max(1).default(0.7),
 });
 
