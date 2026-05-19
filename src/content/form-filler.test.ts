@@ -550,4 +550,39 @@ describe("fillAriaWidget — combobox with portal options", () => {
     expect(result).toMatchObject({ filled: true });
     expect(clicked).toBe("No");
   });
+
+  it("scopes options to aria-controls target so cross-listbox pollution is avoided", async () => {
+    document.body.innerHTML = `
+      <div id="c1" role="combobox" aria-controls="popup1"></div>
+      <div id="popup1"><div role="option">Australia</div></div>
+      <div id="c2" role="combobox" aria-controls="popup2"></div>
+      <div id="popup2"><div role="option">Indonesia</div></div>
+    `;
+    const c1 = document.getElementById("c1") as HTMLElement;
+    let clickedIn1 = "";
+    let clickedIn2 = "";
+    document
+      .querySelectorAll<HTMLElement>("#popup1 [role='option']")
+      .forEach((o) =>
+        o.addEventListener("click", () => {
+          clickedIn1 = o.textContent ?? "";
+        })
+      );
+    document
+      .querySelectorAll<HTMLElement>("#popup2 [role='option']")
+      .forEach((o) =>
+        o.addEventListener("click", () => {
+          clickedIn2 = o.textContent ?? "";
+        })
+      );
+
+    const result = await fillAriaWidget(c1, "Indonesia");
+
+    expect(result).toMatchObject({
+      filled: false,
+      reason: "no matching option",
+    });
+    expect(clickedIn1).toBe("");
+    expect(clickedIn2).toBe("");
+  });
 });

@@ -193,9 +193,7 @@ async function fillAriaListbox(
 ): Promise<{ filled: boolean; reason?: string }> {
   el.click();
   await waitFrame();
-  const options = Array.from(
-    document.querySelectorAll<HTMLElement>('[role="option"]')
-  ).filter((o) => !isVisuallyHidden(o));
+  const options = collectListboxOptions(el);
   const exact = options.find(
     (o) =>
       (o.textContent ?? "").trim().toLowerCase() ===
@@ -214,6 +212,26 @@ async function fillAriaListbox(
   return { filled: true };
 }
 
+function collectListboxOptions(trigger: HTMLElement): HTMLElement[] {
+  const ariaTargetId =
+    trigger.getAttribute("aria-controls") ?? trigger.getAttribute("aria-owns");
+  if (ariaTargetId) {
+    const target = document.getElementById(ariaTargetId);
+    if (target) {
+      return Array.from(
+        target.querySelectorAll<HTMLElement>('[role="option"]')
+      );
+    }
+  }
+  const ownContent = Array.from(
+    trigger.querySelectorAll<HTMLElement>('[role="option"]')
+  );
+  if (ownContent.length > 0) return ownContent;
+  return Array.from(
+    document.querySelectorAll<HTMLElement>('[role="option"]')
+  );
+}
+
 function waitFrame(): Promise<void> {
   return new Promise((resolve) => {
     if (typeof requestAnimationFrame === "function") {
@@ -222,14 +240,6 @@ function waitFrame(): Promise<void> {
       setTimeout(resolve, 0);
     }
   });
-}
-
-function isVisuallyHidden(el: HTMLElement): boolean {
-  const style = el.style;
-  if (style && (style.display === "none" || style.visibility === "hidden")) {
-    return true;
-  }
-  return false;
 }
 
 export function matchAriaOption(needle: string, haystack: string): boolean {
