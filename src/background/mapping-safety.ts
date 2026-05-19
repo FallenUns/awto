@@ -269,7 +269,7 @@ function normalizeSignal(value: string): string {
   return normalizeSpaces(
     value
       .replace(/([a-z])([A-Z])/g, "$1 $2")
-      .replace(/[-_./:[\]"'=#>]+/g, " ")
+      .replace(/[-_./:[\]"'=#>*]+/g, " ")
       .toLowerCase()
   );
 }

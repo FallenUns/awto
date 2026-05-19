@@ -519,4 +519,48 @@ describe("ruleMap", () => {
       expect(phrasePrompt("   ", "userId")).toBe("What's your userId?");
     });
   });
+
+  describe("plain 'Name' label — Google Forms short-answer pattern", () => {
+    const profile: Profile = {
+      firstName: "Patrick",
+      lastName: "Adrianus",
+      custom: {},
+    };
+
+    it("rule-maps 'Name:' directly to fullName (no LLM needed)", () => {
+      const { ruleMappings, remaining } = ruleMap(
+        [labelledField(0, "Name:")],
+        profile
+      );
+      expect(remaining).toEqual([]);
+      expect(ruleMappings[0]).toMatchObject({
+        actionType: "fill",
+        profileKey: "fullName",
+      });
+    });
+
+    it("rule-maps bare 'Name' label to fullName", () => {
+      const { ruleMappings, remaining } = ruleMap(
+        [labelledField(0, "Name")],
+        profile
+      );
+      expect(remaining).toEqual([]);
+      expect(ruleMappings[0]).toMatchObject({
+        actionType: "fill",
+        profileKey: "fullName",
+      });
+    });
+
+    it("rule-maps 'Name *' (required-marker variant) to fullName", () => {
+      const { ruleMappings, remaining } = ruleMap(
+        [labelledField(0, "Name *")],
+        profile
+      );
+      expect(remaining).toEqual([]);
+      expect(ruleMappings[0]).toMatchObject({
+        actionType: "fill",
+        profileKey: "fullName",
+      });
+    });
+  });
 });
