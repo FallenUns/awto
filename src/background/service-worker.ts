@@ -80,7 +80,16 @@ export async function handleMessage(
       }
 
       // Rule layer (autocomplete-tagged fields resolved deterministically)
-      const { ruleMappings, remaining } = ruleMap(message.fields, message.profile);
+      const { ruleMappings: rawRuleMappings, remaining } = ruleMap(
+        message.fields,
+        message.profile
+      );
+
+      // Run the same safety guard on rule-mapper fills as we do on LLM fills.
+      // The rule layer's LABEL_RULES can match "last name" inside quiz/trivia
+      // questions like "What was Luke Skywalker's original last name?" — the
+      // sanitizer's quiz detector + REQUIRE_LABEL_MATCH guard catches those.
+      const ruleMappings = sanitizeMappings(message.fields, rawRuleMappings);
 
       // Existing prefilter on the remaining set (checkboxes/radios → skip)
       const { toLLM, skipped: preSkipped } = prefilter(remaining, message.profile);

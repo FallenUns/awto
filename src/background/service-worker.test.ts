@@ -119,6 +119,44 @@ describe("handleMessage", () => {
     expect(callHybrid.mock.calls[0]?.[1]).toEqual([taggedFields[1]]);
   });
 
+  it("sanitizes rule-mapper fills against trivia questions — Star Wars quiz regression", async () => {
+    const loadLLMSettings = vi.fn().mockResolvedValue(defaultSettings);
+    const callHybrid = vi.fn().mockResolvedValue({
+      response: { mappings: [] },
+      source: "local",
+    });
+
+    const triviaFields: ScannedField[] = [
+      {
+        id: 0,
+        selector: "#q1",
+        label: "What was Luke Skywalker's original last name? 1 point",
+        placeholder: null,
+        type: "text",
+        required: true,
+      },
+    ];
+    const profileWithLastName = {
+      firstName: "Patrick",
+      lastName: "Adrianus",
+      custom: {},
+    };
+
+    const response = await handleMessage(
+      { type: "mapFields", fields: triviaFields, profile: profileWithLastName },
+      { _loadLLMSettings: loadLLMSettings, _callHybrid: callHybrid }
+    );
+
+    expect(response.type).toBe("mapFieldsComplete");
+    if (response.type === "mapFieldsComplete") {
+      const trivia = response.mappings.find((m) => m.fieldId === 0);
+      expect(trivia).toMatchObject({
+        actionType: "skip",
+        reason: expect.stringMatching(/question about someone else/i),
+      });
+    }
+  });
+
   it("does not call the LLM for a fully-recognized RoboForm-style page", async () => {
     const loadLLMSettings = vi.fn().mockResolvedValue(defaultSettings);
     const callHybrid = vi.fn();
