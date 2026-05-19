@@ -123,8 +123,16 @@ export async function fillAriaWidget(
   value: string
 ): Promise<{ filled: boolean; reason?: string }> {
   const role = el.getAttribute("role");
-  if (role === "textbox") return fillAriaTextbox(el, value);
-  return { filled: false, reason: "unsupported aria role" };
+  switch (role) {
+    case "textbox":
+      return fillAriaTextbox(el, value);
+    case "radiogroup":
+      return fillAriaRadioGroup(el, value);
+    case "checkbox":
+      return fillAriaCheckbox(el, value);
+    default:
+      return { filled: false, reason: "unsupported aria role" };
+  }
 }
 
 function fillAriaTextbox(
@@ -142,6 +150,47 @@ function fillAriaTextbox(
   );
   el.blur();
   return { filled: true };
+}
+
+function fillAriaRadioGroup(
+  group: HTMLElement,
+  value: string
+): { filled: boolean; reason?: string } {
+  const radios = Array.from(
+    group.querySelectorAll<HTMLElement>('[role="radio"]')
+  );
+  const exact = radios.find(
+    (r) =>
+      (r.textContent ?? "").trim().toLowerCase() ===
+      value.trim().toLowerCase()
+  );
+  const match =
+    exact ??
+    radios.find((r) =>
+      matchAriaOption(value, (r.textContent ?? "").trim())
+    );
+  if (!match) return { filled: false, reason: "no matching option" };
+  match.click();
+  return { filled: true };
+}
+
+function fillAriaCheckbox(
+  el: HTMLElement,
+  value: string
+): { filled: boolean } {
+  const current = el.getAttribute("aria-checked") === "true";
+  const want = value.trim().toLowerCase() === "true";
+  if (current !== want) el.click();
+  return { filled: true };
+}
+
+function matchAriaOption(needle: string, haystack: string): boolean {
+  const n = needle.trim().toLowerCase();
+  const h = haystack.trim().toLowerCase();
+  if (!n || !h) return false;
+  if (n === h) return true;
+  if (h.includes(n) || n.includes(h)) return true;
+  return false;
 }
 
 function isSemanticallyUnsafeFill(

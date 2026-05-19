@@ -393,3 +393,77 @@ describe("fillAriaWidget — textbox", () => {
     expect(events).toEqual(["input:insertText"]);
   });
 });
+
+describe("fillAriaWidget — radiogroup", () => {
+  it("clicks the radio whose textContent matches the value", async () => {
+    document.body.innerHTML = `
+      <div id="g" role="radiogroup">
+        <div role="radio" data-x="a">Male</div>
+        <div role="radio" data-x="b">Female</div>
+        <div role="radio" data-x="c">Other</div>
+      </div>
+    `;
+    const group = document.getElementById("g") as HTMLElement;
+    const target = group.querySelectorAll<HTMLElement>('[role="radio"]')[1];
+    const clicks: string[] = [];
+    target?.addEventListener("click", () => clicks.push("clicked"));
+
+    const result = await fillAriaWidget(group, "Female");
+
+    expect(result).toMatchObject({ filled: true });
+    expect(clicks).toEqual(["clicked"]);
+  });
+
+  it("returns no matching option when nothing matches", async () => {
+    document.body.innerHTML = `
+      <div id="g" role="radiogroup">
+        <div role="radio">Male</div>
+      </div>
+    `;
+    const result = await fillAriaWidget(
+      document.getElementById("g") as HTMLElement,
+      "Other"
+    );
+    expect(result).toMatchObject({ filled: false, reason: "no matching option" });
+  });
+});
+
+describe("fillAriaWidget — checkbox", () => {
+  it("clicks when state needs to change (false → true)", async () => {
+    document.body.innerHTML = `<div id="c" role="checkbox" aria-checked="false"></div>`;
+    const el = document.getElementById("c") as HTMLElement;
+    let clicks = 0;
+    el.addEventListener("click", () => clicks++);
+
+    const result = await fillAriaWidget(el, "true");
+
+    expect(result).toMatchObject({ filled: true });
+    expect(clicks).toBe(1);
+  });
+
+  it("is idempotent when state already matches", async () => {
+    document.body.innerHTML = `<div id="c" role="checkbox" aria-checked="true"></div>`;
+    const el = document.getElementById("c") as HTMLElement;
+    let clicks = 0;
+    el.addEventListener("click", () => clicks++);
+
+    const result = await fillAriaWidget(el, "true");
+
+    expect(result).toMatchObject({ filled: true });
+    expect(clicks).toBe(0);
+  });
+});
+
+describe("fillAriaWidget — unsupported role", () => {
+  it("returns unsupported aria role for an unknown role", async () => {
+    document.body.innerHTML = `<div id="x" role="foo"></div>`;
+    const result = await fillAriaWidget(
+      document.getElementById("x") as HTMLElement,
+      "anything"
+    );
+    expect(result).toMatchObject({
+      filled: false,
+      reason: "unsupported aria role",
+    });
+  });
+});
