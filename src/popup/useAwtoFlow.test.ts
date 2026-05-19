@@ -563,6 +563,79 @@ describe("useAwtoFlow", () => {
     expect(result.current.state.skippedRows).toHaveLength(1);
   });
 
+  it("keeps resolving LLM rows after filling parser-resolved rows during mapping", async () => {
+    const portHandle = makePort();
+    const queryActiveTab = vi.fn().mockResolvedValue({ id: 42 });
+    const sendToTab = vi
+      .fn()
+      .mockImplementation(async (_tabId: number, msg: AwtoMessage) => {
+        if (msg.type === "scanForm") {
+          return { type: "scanFormResult", fields } satisfies AwtoMessage;
+        }
+        if (msg.type === "fillForm") {
+          return {
+            type: "fillFormResult",
+            filled: msg.values.length,
+            failed: [],
+          } satisfies AwtoMessage;
+        }
+        throw new Error(`unexpected tab message: ${msg.type}`);
+      });
+    const loadProfileMock = vi.fn().mockResolvedValue(baseProfile);
+    const saveProfileMock = vi.fn().mockResolvedValue(undefined);
+    const closePopup = vi.fn();
+
+    const { result } = renderHook(() =>
+      useAwtoFlow({
+        _connect: (() => portHandle.port) as unknown as typeof chrome.runtime.connect,
+        _sendToTab: sendToTab,
+        _queryActiveTab: queryActiveTab,
+        _loadProfile: loadProfileMock,
+        _saveProfile: saveProfileMock,
+        _closePopup: closePopup,
+      })
+    );
+
+    await waitFor(() => {
+      expect(
+        portHandle.posted.some((m) => m.type === "mapFields")
+      ).toBe(true);
+    });
+
+    await act(async () => {
+      portHandle.autoReply({
+        type: "mapFieldsProgress",
+        mappings: [mappings[0]!],
+      });
+    });
+
+    expect(result.current.status).toBe("mapping");
+
+    await act(async () => {
+      await result.current.fill();
+    });
+
+    expect(portHandle.disconnected.value).toBe(false);
+    expect(result.current.status).toBe("mapping");
+    expect(result.current.state.filledCount).toBe(1);
+    expect(closePopup).not.toHaveBeenCalled();
+
+    await act(async () => {
+      portHandle.autoReply({
+        type: "mapFieldsComplete",
+        mappings,
+        source: "local",
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.status).toBe("ready");
+    });
+    expect(result.current.state.fillRows).toHaveLength(1);
+    expect(result.current.state.missingRows).toHaveLength(1);
+    expect(result.current.state.skippedRows).toHaveLength(1);
+  });
+
   it("rescan() posts mapFields with bypassCache: true", async () => {
     const deps = makeDeps();
     const { result } = renderFlow(deps);

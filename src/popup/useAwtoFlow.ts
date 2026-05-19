@@ -343,15 +343,7 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
     const tabId = tabIdRef.current;
     if (tabId === null) return;
 
-    const port = portRef.current;
-    if (port && stateRef.current.status === "mapping") {
-      try {
-        port.disconnect();
-      } catch {
-        // disconnect can throw on already-disconnected ports
-      }
-      portRef.current = null;
-    }
+    const fillStartedDuringMapping = stateRef.current.status === "mapping";
 
     setState((s) => ({ ...s, status: "filling", error: null }));
 
@@ -401,9 +393,14 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
               reason: f.reason,
             };
           });
+          const nextStatus = fillStartedDuringMapping
+            ? s.status === "ready" || s.status === "error"
+              ? s.status
+              : "mapping"
+            : "done";
           return {
             ...s,
-            status: "done",
+            status: nextStatus,
             filledCount: reply.filled,
             failedFills,
           };

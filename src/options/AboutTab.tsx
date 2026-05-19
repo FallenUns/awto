@@ -42,7 +42,7 @@ export function AboutTab() {
             <Github size={16} strokeWidth={1.5} aria-hidden="true" />
             <a
               className="awto-link"
-              href="https://github.com/your-username/awto"
+              href="https://github.com/FallenUns/awto"
               target="_blank"
               rel="noreferrer"
             >
@@ -53,7 +53,7 @@ export function AboutTab() {
             <BookOpen size={16} strokeWidth={1.5} aria-hidden="true" />
             <a
               className="awto-link"
-              href="https://github.com/your-username/awto#readme"
+              href="https://github.com/FallenUns/awto#readme"
               target="_blank"
               rel="noreferrer"
             >
@@ -64,7 +64,7 @@ export function AboutTab() {
             <FileText size={16} strokeWidth={1.5} aria-hidden="true" />
             <a
               className="awto-link"
-              href="https://github.com/your-username/awto/blob/main/LICENSE"
+              href="https://github.com/FallenUns/awto/blob/main/LICENSE"
               target="_blank"
               rel="noreferrer"
             >
