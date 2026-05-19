@@ -342,7 +342,12 @@ function extractLabel(el: Fillable, doc: Document): string {
   if (labelledBy) {
     const ids = labelledBy.split(/\s+/).filter(Boolean);
     const parts = ids
-      .map((id) => doc.getElementById(id)?.textContent?.trim() ?? "")
+      .map((id) => {
+        const target = doc.getElementById(id);
+        if (!target) return "";
+        if (target.getAttribute("aria-hidden") === "true") return "";
+        return target.textContent?.trim() ?? "";
+      })
       .filter((s) => s.length > 0);
     const joined = parts.join(" ").trim();
     if (joined) return joined;
@@ -544,7 +549,12 @@ function extractAriaLabel(el: HTMLElement, doc: Document): string {
   if (labelledBy) {
     const ids = labelledBy.split(/\s+/).filter(Boolean);
     const text = ids
-      .map((id) => doc.getElementById(id)?.textContent?.trim() ?? "")
+      .map((id) => {
+        const target = doc.getElementById(id);
+        if (!target) return "";
+        if (target.getAttribute("aria-hidden") === "true") return "";
+        return target.textContent?.trim() ?? "";
+      })
       .filter((s) => s.length > 0)
       .join(" ")
       .trim();

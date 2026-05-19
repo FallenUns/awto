@@ -201,6 +201,24 @@ describe("sanitizeMappings", () => {
       const m = fill(0, "firstName");
       expect(sanitizeMappings([field(0, "First Name")], [m])).toEqual([m]);
     });
+
+    it("allows fullName on a plain 'Name:' field (Google Forms pattern)", () => {
+      const m = fill(0, "fullName");
+      expect(sanitizeMappings([field(0, "Name:")], [m])).toEqual([m]);
+    });
+
+    it("allows fullName on a label 'Name' with no qualifier", () => {
+      const m = fill(0, "fullName");
+      expect(sanitizeMappings([field(0, "Name")], [m])).toEqual([m]);
+    });
+
+    it("still blocks fullName on a 'Username' field (no false positive)", () => {
+      const sanitized = sanitizeMappings(
+        [field(0, "Username")],
+        [fill(0, "fullName")]
+      );
+      expect(sanitized[0]).toMatchObject({ actionType: "missing" });
+    });
   });
 
   describe("LLM-generated promptText normalisation", () => {

@@ -79,6 +79,7 @@ const INTENT_RULES: IntentRule[] = [
   { patterns: [/\bmiddle\s*name\b/], allow: ["middleName"] },
   { patterns: [/\blast\s*name\b/, /\bfamily\s*name\b/, /\bsurname\b/], allow: ["lastName"] },
   { patterns: [/\bfull\s*name\b/, /\byour\s*name\b/, /\bcustomer\s*name\b/], allow: ["fullName"] },
+  { patterns: [/^\s*name\s*[:*]?\s*$/i, /^\s*name\s*\*?\s*$/i], allow: ["fullName", "firstName", "lastName"] },
   { patterns: [/\bcompany\b/, /\bemployer\b/], allow: ["currentEmployer"] },
   { patterns: [/\bposition\b/, /\bjob\s*title\b/], allow: ["jobTitle"] },
   { patterns: [/\baddress\s*line\s*1\b/, /\bstreet\s*address\b/], allow: ["addressLine1"] },

@@ -89,6 +89,18 @@ describe("scanFields", () => {
     expect(fields[0]?.label).toBe("Date of birth");
   });
 
+  it("ignores aria-hidden=true elements referenced via aria-labelledby (Google Forms placeholder pattern)", () => {
+    setBody(`
+      <form>
+        <div id="lbl-name"><span>Name:</span></div>
+        <div id="lbl-placeholder" aria-hidden="true">Your answer</div>
+        <input type="text" name="name" aria-labelledby="lbl-name lbl-placeholder" />
+      </form>
+    `);
+    const fields = scanFields(document);
+    expect(fields[0]?.label).toBe("Name:");
+  });
+
   it("falls back to placeholder and reports it separately too", () => {
     setBody(`
       <form>
