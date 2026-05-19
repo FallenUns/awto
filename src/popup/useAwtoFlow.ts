@@ -343,6 +343,16 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
     const tabId = tabIdRef.current;
     if (tabId === null) return;
 
+    const port = portRef.current;
+    if (port && stateRef.current.status === "mapping") {
+      try {
+        port.disconnect();
+      } catch {
+        // disconnect can throw on already-disconnected ports
+      }
+      portRef.current = null;
+    }
+
     setState((s) => ({ ...s, status: "filling", error: null }));
 
     try {

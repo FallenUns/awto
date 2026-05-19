@@ -253,7 +253,7 @@ export function Popup() {
       {isMappingOrReady && (
         <ActionBar
           filling={status === "filling"}
-          fillDisabled={status !== "ready" || fillDisabled}
+          fillDisabled={fillDisabled}
           fillCount={totalToFill}
           onCancel={cancel}
           onFill={() => void fill()}

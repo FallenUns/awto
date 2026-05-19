@@ -150,12 +150,13 @@ describe("Popup progressive row resolution", () => {
     expect(document.querySelectorAll(".awto-fieldrow")).toHaveLength(3);
   });
 
-  it("renders ActionBar with Fill disabled during mapping", async () => {
+  it("enables Fill during mapping when there's at least one rule-resolved row (progressive fill)", async () => {
     mockFlow({
       status: "mapping",
       state: {
         loadingFields: [
           { id: 0, selector: "#a", label: "First name", placeholder: null, type: "text", required: false },
+          { id: 1, selector: "#b", label: "Trivia", placeholder: null, type: "text", required: false },
         ],
         fillRows: [
           { fieldId: 0, selector: "#a", label: "First name", profileKey: "firstName", resolvedValue: "Patrick", confidence: 1 },
@@ -165,7 +166,24 @@ describe("Popup progressive row resolution", () => {
     const { Popup: PopupDyn } = await import("./Popup");
     const { render: renderDyn, screen: screenDyn } = await import("@testing-library/react");
     renderDyn(<PopupDyn />);
-    const fillBtn = screenDyn.getByRole("button", { name: /mapping|fill/i });
+    const fillBtn = screenDyn.getByRole("button", { name: /fill 1 field/i });
+    expect((fillBtn as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("Fill stays disabled during mapping when no rule-resolved rows exist yet", async () => {
+    mockFlow({
+      status: "mapping",
+      state: {
+        loadingFields: [
+          { id: 0, selector: "#a", label: "Trivia", placeholder: null, type: "text", required: false },
+        ],
+        fillRows: [],
+      },
+    });
+    const { Popup: PopupDyn } = await import("./Popup");
+    const { render: renderDyn, screen: screenDyn } = await import("@testing-library/react");
+    renderDyn(<PopupDyn />);
+    const fillBtn = screenDyn.getByRole("button", { name: /fill/i });
     expect((fillBtn as HTMLButtonElement).disabled).toBe(true);
   });
 
