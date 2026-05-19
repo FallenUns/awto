@@ -30,26 +30,26 @@ describe("fillFields", () => {
     document.body.innerHTML = "";
   });
 
-  it("fills a text input and dispatches input + change events", () => {
+  it("fills a text input and dispatches input + change events", async () => {
     setBody(`<input id="name" type="text" />`);
     const input = document.querySelector("#name") as HTMLInputElement;
     const inputEvents: string[] = [];
     input.addEventListener("input", () => inputEvents.push("input"));
     input.addEventListener("change", () => inputEvents.push("change"));
-    const result = fillFields(document, [{ selector: "#name", value: "Patrick" }]);
+    const result = await fillFields(document, [{ selector: "#name", value: "Patrick" }]);
     expect(input.value).toBe("Patrick");
     expect(inputEvents).toEqual(["input", "change"]);
     expect(result.filled).toBe(1);
     expect(result.failed).toEqual([]);
   });
 
-  it("fills an email input and dispatches input + change", () => {
+  it("fills an email input and dispatches input + change", async () => {
     setBody(`<input id="email" type="email" />`);
     const input = document.querySelector("#email") as HTMLInputElement;
     const events: string[] = [];
     input.addEventListener("input", () => events.push("input"));
     input.addEventListener("change", () => events.push("change"));
-    const result = fillFields(document, [
+    const result = await fillFields(document, [
       { selector: "#email", value: "p@example.com" },
     ]);
     expect(input.value).toBe("p@example.com");
@@ -57,13 +57,13 @@ describe("fillFields", () => {
     expect(result.filled).toBe(1);
   });
 
-  it("fills a textarea and dispatches input + change", () => {
+  it("fills a textarea and dispatches input + change", async () => {
     setBody(`<textarea id="bio"></textarea>`);
     const textarea = document.querySelector("#bio") as HTMLTextAreaElement;
     const events: string[] = [];
     textarea.addEventListener("input", () => events.push("input"));
     textarea.addEventListener("change", () => events.push("change"));
-    const result = fillFields(document, [
+    const result = await fillFields(document, [
       { selector: "#bio", value: "Hi there" },
     ]);
     expect(textarea.value).toBe("Hi there");
@@ -71,7 +71,7 @@ describe("fillFields", () => {
     expect(result.filled).toBe(1);
   });
 
-  it("uses the React/Vue value-setter trick on inputs", () => {
+  it("uses the React/Vue value-setter trick on inputs", async () => {
     setBody(`<input id="name" type="text" />`);
     const input = document.querySelector("#name") as HTMLInputElement;
     const setterSpy = vi.fn();
@@ -86,14 +86,14 @@ describe("fillFields", () => {
       },
     });
     try {
-      fillFields(document, [{ selector: "#name", value: "Hello" }]);
+      await fillFields(document, [{ selector: "#name", value: "Hello" }]);
       expect(setterSpy).toHaveBeenCalledWith("Hello");
     } finally {
       Object.defineProperty(proto, "value", descriptor!);
     }
   });
 
-  it("sets a <select> by exact value match", () => {
+  it("sets a <select> by exact value match", async () => {
     setBody(`
       <select id="state">
         <option value="vic">Victoria</option>
@@ -103,13 +103,13 @@ describe("fillFields", () => {
     const select = document.querySelector("#state") as HTMLSelectElement;
     let changeCount = 0;
     select.addEventListener("change", () => changeCount++);
-    const result = fillFields(document, [{ selector: "#state", value: "vic" }]);
+    const result = await fillFields(document, [{ selector: "#state", value: "vic" }]);
     expect(select.value).toBe("vic");
     expect(changeCount).toBe(1);
     expect(result.filled).toBe(1);
   });
 
-  it("sets a <select> by case-insensitive visible text match", () => {
+  it("sets a <select> by case-insensitive visible text match", async () => {
     setBody(`
       <select id="state">
         <option value="vic">Victoria</option>
@@ -117,20 +117,20 @@ describe("fillFields", () => {
       </select>
     `);
     const select = document.querySelector("#state") as HTMLSelectElement;
-    const result = fillFields(document, [
+    const result = await fillFields(document, [
       { selector: "#state", value: "  victoria  " },
     ]);
     expect(select.value).toBe("vic");
     expect(result.filled).toBe(1);
   });
 
-  it("fails with 'no matching option' when the select has no match", () => {
+  it("fails with 'no matching option' when the select has no match", async () => {
     setBody(`
       <select id="state">
         <option value="vic">Victoria</option>
       </select>
     `);
-    const result = fillFields(document, [
+    const result = await fillFields(document, [
       { selector: "#state", value: "Tasmania" },
     ]);
     expect(result.filled).toBe(0);
@@ -139,19 +139,19 @@ describe("fillFields", () => {
     ]);
   });
 
-  it("checks a checkbox when value is 'true' and unchecks when 'false'", () => {
+  it("checks a checkbox when value is 'true' and unchecks when 'false'", async () => {
     setBody(`<input id="tos" type="checkbox" />`);
     const cb = document.querySelector("#tos") as HTMLInputElement;
     let changeCount = 0;
     cb.addEventListener("change", () => changeCount++);
-    fillFields(document, [{ selector: "#tos", value: "true" }]);
+    await fillFields(document, [{ selector: "#tos", value: "true" }]);
     expect(cb.checked).toBe(true);
-    fillFields(document, [{ selector: "#tos", value: "false" }]);
+    await fillFields(document, [{ selector: "#tos", value: "false" }]);
     expect(cb.checked).toBe(false);
     expect(changeCount).toBe(2);
   });
 
-  it("selects a radio in a group by value", () => {
+  it("selects a radio in a group by value", async () => {
     setBody(`
       <input type="radio" name="sub" value="yes" id="ry" />
       <input type="radio" name="sub" value="no" id="rn" />
@@ -160,16 +160,16 @@ describe("fillFields", () => {
     const no = document.querySelector("#rn") as HTMLInputElement;
     let changeCount = 0;
     yes.addEventListener("change", () => changeCount++);
-    const result = fillFields(document, [{ selector: "#ry", value: "yes" }]);
+    const result = await fillFields(document, [{ selector: "#ry", value: "yes" }]);
     expect(yes.checked).toBe(true);
     expect(no.checked).toBe(false);
     expect(changeCount).toBe(1);
     expect(result.filled).toBe(1);
   });
 
-  it("returns 'selector not found' for an unresolvable selector", () => {
+  it("returns 'selector not found' for an unresolvable selector", async () => {
     setBody(`<input id="x" type="text" />`);
-    const result = fillFields(document, [
+    const result = await fillFields(document, [
       { selector: "#does-not-exist", value: "x" },
     ]);
     expect(result.filled).toBe(0);
@@ -178,14 +178,14 @@ describe("fillFields", () => {
     ]);
   });
 
-  it("returns the correct filled count for a mixed batch", () => {
+  it("returns the correct filled count for a mixed batch", async () => {
     setBody(`
       <input id="a" type="text" />
       <select id="s">
         <option value="x">X</option>
       </select>
     `);
-    const result = fillFields(document, [
+    const result = await fillFields(document, [
       { selector: "#a", value: "hello" },
       { selector: "#missing", value: "nope" },
       { selector: "#s", value: "not-an-option" },
@@ -202,7 +202,7 @@ describe("fillFields", () => {
     });
   });
 
-  it("refuses to put street address into a field visibly labelled City", () => {
+  it("refuses to put street address into a field visibly labelled City", async () => {
     setBody(`
       <form>
         <label for="city">City</label>
@@ -210,7 +210,7 @@ describe("fillFields", () => {
       </form>
     `);
 
-    const result = fillFields(document, [
+    const result = await fillFields(document, [
       {
         selector: "#city",
         value: "327 La Trobe Street",
@@ -226,7 +226,7 @@ describe("fillFields", () => {
     expect((document.querySelector("#city") as HTMLInputElement).value).toBe("");
   });
 
-  it("uses the nearest duplicate explicit label before deciding whether a fill is safe", () => {
+  it("uses the nearest duplicate explicit label before deciding whether a fill is safe", async () => {
     setBody(`
       <form>
         <label for="address-line1">Street address</label>
@@ -236,7 +236,7 @@ describe("fillFields", () => {
       </form>
     `);
 
-    const result = fillFields(document, [
+    const result = await fillFields(document, [
       {
         selector: "#address-line1",
         value: "327 La Trobe Street",
@@ -254,7 +254,7 @@ describe("fillFields", () => {
     ).toBe("");
   });
 
-  it("allows city value into a visually labelled City field despite misleading HTML", () => {
+  it("allows city value into a visually labelled City field despite misleading HTML", async () => {
     setBody(`
       <form>
         <div id="city-label">City</div>
@@ -264,7 +264,7 @@ describe("fillFields", () => {
     setRect("#city-label", { left: 100, top: 20, width: 60, height: 20 });
     setRect("#city", { left: 220, top: 15, width: 180, height: 32 });
 
-    const result = fillFields(document, [
+    const result = await fillFields(document, [
       {
         selector: "#city",
         value: "Melbourne",
@@ -286,7 +286,7 @@ describe("fillFields select fuzzy match", () => {
     document.body.innerHTML = "";
   });
 
-  it("falls back to substring match when exact match fails", () => {
+  it("falls back to substring match when exact match fails", async () => {
     setBody(`
       <select id="state">
         <option value="vic">Victoria</option>
@@ -294,7 +294,7 @@ describe("fillFields select fuzzy match", () => {
         <option value="qld">Queensland</option>
       </select>
     `);
-    const result = fillFields(document, [{ selector: "#state", value: "vic" }]);
+    const result = await fillFields(document, [{ selector: "#state", value: "vic" }]);
     expect(result.filled).toBe(1);
     expect(result.failed).toEqual([]);
 
@@ -305,12 +305,12 @@ describe("fillFields select fuzzy match", () => {
         <option value="2">New South Wales</option>
       </select>
     `);
-    const r2 = fillFields(document, [{ selector: "#state2", value: "Vic" }]);
+    const r2 = await fillFields(document, [{ selector: "#state2", value: "Vic" }]);
     expect(r2.filled).toBe(1);
     expect((document.querySelector("#state2") as HTMLSelectElement).value).toBe("1");
   });
 
-  it("falls back to Levenshtein match for typos", () => {
+  it("falls back to Levenshtein match for typos", async () => {
     setBody(`
       <select id="country">
         <option value="au">Australia</option>
@@ -318,39 +318,39 @@ describe("fillFields select fuzzy match", () => {
       </select>
     `);
     // Typo: "Austraila" -> Levenshtein 2 from "Australia"
-    const result = fillFields(document, [
+    const result = await fillFields(document, [
       { selector: "#country", value: "Austraila" },
     ]);
     expect(result.filled).toBe(1);
     expect((document.querySelector("#country") as HTMLSelectElement).value).toBe("au");
   });
 
-  it("still fails when no fuzzy match is close enough", () => {
+  it("still fails when no fuzzy match is close enough", async () => {
     setBody(`
       <select id="planet">
         <option value="e">Earth</option>
         <option value="v">Venus</option>
       </select>
     `);
-    const result = fillFields(document, [{ selector: "#planet", value: "Mars" }]);
+    const result = await fillFields(document, [{ selector: "#planet", value: "Mars" }]);
     expect(result.filled).toBe(0);
     expect(result.failed).toHaveLength(1);
     expect(result.failed[0]?.reason).toBe("no matching option");
   });
 
-  it("prefers exact match over fuzzy", () => {
+  it("prefers exact match over fuzzy", async () => {
     setBody(`
       <select id="x">
         <option value="a">Australia</option>
         <option value="b">Austria</option>
       </select>
     `);
-    const result = fillFields(document, [{ selector: "#x", value: "Austria" }]);
+    const result = await fillFields(document, [{ selector: "#x", value: "Austria" }]);
     expect(result.filled).toBe(1);
     expect((document.querySelector("#x") as HTMLSelectElement).value).toBe("b");
   });
 
-  it("matches numeric month values to month names", () => {
+  it("matches numeric month values to month names", async () => {
     setBody(`
       <select id="month">
         <option value="">Month</option>
@@ -358,12 +358,12 @@ describe("fillFields select fuzzy match", () => {
         <option value="Feb">Feb</option>
       </select>
     `);
-    const result = fillFields(document, [{ selector: "#month", value: "01" }]);
+    const result = await fillFields(document, [{ selector: "#month", value: "01" }]);
     expect(result.filled).toBe(1);
     expect((document.querySelector("#month") as HTMLSelectElement).value).toBe("Jan");
   });
 
-  it("matches month names to numeric option values", () => {
+  it("matches month names to numeric option values", async () => {
     setBody(`
       <select id="month">
         <option value="">Month</option>
@@ -371,9 +371,62 @@ describe("fillFields select fuzzy match", () => {
         <option value="02">February</option>
       </select>
     `);
-    const result = fillFields(document, [{ selector: "#month", value: "Jan" }]);
+    const result = await fillFields(document, [{ selector: "#month", value: "Jan" }]);
     expect(result.filled).toBe(1);
     expect((document.querySelector("#month") as HTMLSelectElement).value).toBe("01");
+  });
+});
+
+describe("fillFields — ARIA dispatch", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("routes an ARIA radiogroup target through fillAriaWidget", async () => {
+    document.body.innerHTML = `
+      <div id="g" role="radiogroup">
+        <div role="radio">A</div>
+        <div role="radio">B</div>
+      </div>
+    `;
+    let clicked = "";
+    document.querySelectorAll<HTMLElement>('[role="radio"]').forEach((r) => {
+      r.addEventListener("click", () => {
+        clicked = r.textContent ?? "";
+      });
+    });
+    const result = await fillFields(document, [
+      { selector: "#g", value: "B", label: "Pick", profileKey: "x" },
+    ]);
+    expect(result.filled).toBe(1);
+    expect(clicked).toBe("B");
+  });
+
+  it("surfaces ARIA fill failures in the failed array", async () => {
+    document.body.innerHTML = `
+      <div id="g" role="radiogroup">
+        <div role="radio">A</div>
+      </div>
+    `;
+    const result = await fillFields(document, [
+      { selector: "#g", value: "Z", label: "Pick", profileKey: "x" },
+    ]);
+    expect(result.filled).toBe(0);
+    expect(result.failed).toHaveLength(1);
+    expect(result.failed[0]).toMatchObject({
+      selector: "#g",
+      reason: "no matching option",
+    });
+  });
+
+  it("routes an ARIA textbox target through fillAriaWidget", async () => {
+    document.body.innerHTML = `<div id="t" role="textbox" contenteditable="true"></div>`;
+    const el = document.getElementById("t") as HTMLElement;
+    const result = await fillFields(document, [
+      { selector: "#t", value: "Patrick" },
+    ]);
+    expect(result.filled).toBe(1);
+    expect(el.textContent).toBe("Patrick");
   });
 });
 

@@ -5,10 +5,10 @@ export interface FillResult {
   failed: Array<{ selector: string; reason: string }>;
 }
 
-export function fillFields(
+export async function fillFields(
   root: Document | HTMLElement,
   values: FillValue[]
-): FillResult {
+): Promise<FillResult> {
   let filled = 0;
   const failed: Array<{ selector: string; reason: string }> = [];
 
@@ -20,6 +20,25 @@ export function fillFields(
     }
     if (isSemanticallyUnsafeFill(el, profileKey)) {
       failed.push({ selector, reason: "label mismatch" });
+      continue;
+    }
+
+    if (
+      !(el instanceof HTMLInputElement) &&
+      !(el instanceof HTMLSelectElement) &&
+      !(el instanceof HTMLTextAreaElement) &&
+      el instanceof HTMLElement &&
+      el.hasAttribute("role")
+    ) {
+      const ariaResult = await fillAriaWidget(el, value);
+      if (ariaResult.filled) {
+        filled++;
+      } else {
+        failed.push({
+          selector,
+          reason: ariaResult.reason ?? "ARIA fill failed",
+        });
+      }
       continue;
     }
 

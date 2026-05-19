@@ -21,9 +21,10 @@ chrome.runtime.onMessage.addListener(
     if (message.type === "scanForm") {
       sendResponse({ type: "scanFormResult", fields: scanFields(document) });
     } else if (message.type === "fillForm") {
-      const result = fillFields(document, message.values);
-      sendResponse({ type: "fillFormResult", ...result });
-      widget.setHidden("filled");
+      void fillFields(document, message.values).then((result) => {
+        sendResponse({ type: "fillFormResult", ...result });
+        widget.setHidden("filled");
+      });
     }
     return true;
   }
