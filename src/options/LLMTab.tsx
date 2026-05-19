@@ -396,6 +396,46 @@ export function LLMTab({
           Your API key never leaves this device.
         </p>
       </section>
+
+      <section className="awto-card" aria-labelledby="card-aria-forms">
+        <div className="awto-card__header">
+          <div>
+            <h3 id="card-aria-forms" className="awto-card__title">
+              Custom-widget forms
+            </h3>
+            <p className="awto-card__subtitle">
+              Support for sites that use ARIA widgets instead of native inputs.
+            </p>
+          </div>
+          {saveStatus === "saved" && (
+            <span
+              className="awto-badge awto-badge--success awto-badge--saved"
+              aria-live="polite"
+            >
+              Saved
+            </span>
+          )}
+        </div>
+
+        <div className="awto-field">
+          <label className="awto-toggle" htmlFor="aria-forms-enabled">
+            <input
+              id="aria-forms-enabled"
+              type="checkbox"
+              checked={settings.enableAriaForms}
+              onChange={(e) =>
+                onUpdate({ enableAriaForms: e.target.checked })
+              }
+            />
+            <span className="awto-label">Fill custom-widget forms</span>
+          </label>
+          <p className="awto-helper--inline">
+            Adds support for Google Forms, Microsoft Forms, and other forms
+            that use ARIA widgets instead of native inputs. Turn off if a site
+            fills incorrectly.
+          </p>
+        </div>
+      </section>
     </div>
   );
 }
