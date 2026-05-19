@@ -101,28 +101,71 @@ export function scanFields(
     const nativeElements = new Set<Element>(
       candidates.filter((c) => isEligible(c))
     );
-    const radiogroups = Array.from(
-      root.querySelectorAll<HTMLElement>('[role="radiogroup"]')
-    );
-    for (const group of radiogroups) {
-      if (containsAny(group, nativeElements)) continue;
-      if (isHidden(group)) continue;
-      if (group.getAttribute("aria-disabled") === "true") continue;
-      const options = Array.from(
-        group.querySelectorAll<HTMLElement>('[role="radio"]')
-      )
-        .map((r) => (r.textContent ?? "").trim())
-        .filter((t) => t.length > 0);
-      if (options.length === 0) continue;
-      fields.push({
-        id: nextId++,
-        selector: buildAriaSelector(group, ownerDoc),
-        label: extractAriaLabel(group, ownerDoc),
-        placeholder: null,
+
+    const queries: Array<{
+      selector: string;
+      type: string;
+      collectOptions?: (el: HTMLElement) => string[];
+    }> = [
+      {
+        selector: '[role="radiogroup"]',
         type: "radio",
-        required: group.getAttribute("aria-required") === "true",
-        options,
-      });
+        collectOptions: (el) =>
+          Array.from(el.querySelectorAll<HTMLElement>('[role="radio"]'))
+            .map((r) => (r.textContent ?? "").trim())
+            .filter((t) => t.length > 0),
+      },
+      { selector: '[role="checkbox"]', type: "checkbox" },
+      { selector: '[role="textbox"][contenteditable="true"]', type: "text" },
+      {
+        selector: '[role="combobox"]',
+        type: "select",
+        collectOptions: (el) =>
+          Array.from(el.querySelectorAll<HTMLElement>('[role="option"]'))
+            .map((o) => (o.textContent ?? "").trim())
+            .filter((t) => t.length > 0),
+      },
+      {
+        selector: '[role="listbox"]',
+        type: "select",
+        collectOptions: (el) =>
+          Array.from(el.querySelectorAll<HTMLElement>('[role="option"]'))
+            .map((o) => (o.textContent ?? "").trim())
+            .filter((t) => t.length > 0),
+      },
+    ];
+
+    const claimed = new Set<Element>();
+    for (const q of queries) {
+      const els = Array.from(root.querySelectorAll<HTMLElement>(q.selector));
+      for (const el of els) {
+        if (claimed.has(el)) continue;
+        if (containsAny(el, nativeElements)) continue;
+        if (isHidden(el)) continue;
+        if (el.getAttribute("aria-disabled") === "true") continue;
+
+        if (
+          q.type === "select" &&
+          q.selector === '[role="listbox"]' &&
+          el.closest('[role="combobox"]')
+        ) {
+          continue;
+        }
+
+        const options = q.collectOptions?.(el);
+        if (q.collectOptions && (!options || options.length === 0)) continue;
+
+        fields.push({
+          id: nextId++,
+          selector: buildAriaSelector(el, ownerDoc),
+          label: extractAriaLabel(el, ownerDoc),
+          placeholder: null,
+          type: q.type,
+          required: el.getAttribute("aria-required") === "true",
+          ...(options ? { options } : {}),
+        });
+        claimed.add(el);
+      }
     }
   }
 

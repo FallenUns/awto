@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 
 (globalThis as unknown as { chrome: unknown }).chrome = {
   storage: {
@@ -575,5 +575,146 @@ describe("scanFields", () => {
       const fields = scanFields();
       expect(fields[0]?.selector).toBe('[aria-labelledby="lbl-pendidikan"]');
     });
+  });
+});
+
+describe("ARIA checkbox", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("scans a standalone ARIA checkbox", () => {
+    document.body.innerHTML = `
+      <div id="lbl">I agree to the terms</div>
+      <div role="checkbox" aria-labelledby="lbl" aria-checked="false"></div>
+    `;
+    const fields = scanFields();
+    expect(fields).toHaveLength(1);
+    expect(fields[0]).toMatchObject({
+      label: "I agree to the terms",
+      type: "checkbox",
+    });
+  });
+});
+
+describe("ARIA textbox (contenteditable)", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("scans role=textbox contenteditable as text input", () => {
+    document.body.innerHTML = `
+      <div id="lbl-short">Your answer</div>
+      <div role="textbox" contenteditable="true" aria-labelledby="lbl-short"></div>
+    `;
+    const fields = scanFields();
+    expect(fields).toHaveLength(1);
+    expect(fields[0]).toMatchObject({
+      label: "Your answer",
+      type: "text",
+    });
+  });
+
+  it("ignores role=textbox WITHOUT contenteditable", () => {
+    document.body.innerHTML = `
+      <div role="textbox">Read only</div>
+    `;
+    expect(scanFields()).toEqual([]);
+  });
+});
+
+describe("ARIA combobox / listbox", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("scans a combobox with role=option children as a select", () => {
+    document.body.innerHTML = `
+      <div id="lbl-state">State</div>
+      <div role="combobox" aria-labelledby="lbl-state">
+        <div role="option">Victoria</div>
+        <div role="option">New South Wales</div>
+        <div role="option">Queensland</div>
+      </div>
+    `;
+    const fields = scanFields();
+    expect(fields[0]).toMatchObject({
+      type: "select",
+      options: ["Victoria", "New South Wales", "Queensland"],
+    });
+  });
+
+  it("scans a top-level listbox", () => {
+    document.body.innerHTML = `
+      <div id="lbl-country">Country</div>
+      <div role="listbox" aria-labelledby="lbl-country">
+        <div role="option">Australia</div>
+        <div role="option">New Zealand</div>
+      </div>
+    `;
+    const fields = scanFields();
+    expect(fields[0]).toMatchObject({
+      type: "select",
+      options: ["Australia", "New Zealand"],
+    });
+  });
+
+  it("does not double-count a listbox that lives inside a combobox", () => {
+    document.body.innerHTML = `
+      <div role="combobox" aria-label="Pick one">
+        <div role="listbox">
+          <div role="option">A</div>
+          <div role="option">B</div>
+        </div>
+      </div>
+    `;
+    expect(scanFields()).toHaveLength(1);
+  });
+});
+
+describe("ARIA de-dupe with native pass", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("does not double-count a native input wrapped in a role=textbox", () => {
+    document.body.innerHTML = `
+      <div role="textbox" contenteditable="true">
+        <input type="text" name="x" />
+      </div>
+    `;
+    const fields = scanFields();
+    expect(fields).toHaveLength(1);
+  });
+});
+
+describe("ARIA respects disabled flag", () => {
+  it("skips when settings disable ARIA scanning", async () => {
+    const originalChrome = (globalThis as unknown as { chrome: unknown }).chrome;
+    try {
+      (globalThis as unknown as { chrome: unknown }).chrome = {
+        storage: {
+          local: {
+            get: () => Promise.resolve({ "awto:llm": { enableAriaForms: false } }),
+          },
+          onChanged: { addListener: () => {} },
+        },
+      };
+      vi.resetModules();
+      const { hydrateAriaSettings } = await import("./aria-settings");
+      await hydrateAriaSettings();
+      const { scanFields: scan } = await import("./form-scanner");
+
+      document.body.innerHTML = `
+        <div role="radiogroup" aria-label="X">
+          <div role="radio">A</div>
+          <div role="radio">B</div>
+        </div>
+      `;
+      expect(scan()).toEqual([]);
+    } finally {
+      (globalThis as unknown as { chrome: unknown }).chrome = originalChrome;
+      vi.resetModules();
+    }
   });
 });
