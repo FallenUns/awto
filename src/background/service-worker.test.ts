@@ -34,6 +34,7 @@ const defaultSettings: LLMSettings = {
   anthropicApiKey: "",
   anthropicModel: "claude-opus-4-7",
   cloudFallbackEnabled: true,
+  enableAriaForms: true,
   confidenceThreshold: 0.7,
 };
 
