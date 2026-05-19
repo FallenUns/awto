@@ -221,6 +221,62 @@ describe("sanitizeMappings", () => {
     });
   });
 
+  describe("quiz / trivia question detection", () => {
+    it("skips lastName on a trivia question that asks about a third party", () => {
+      const sanitized = sanitizeMappings(
+        [field(0, "What was Luke Skywalker's original last name? 1 point")],
+        [fill(0, "lastName")]
+      );
+      expect(sanitized[0]).toMatchObject({
+        actionType: "skip",
+        reason: expect.stringMatching(/quiz|question about|third party|trivia/i),
+      });
+    });
+
+    it("skips firstName on a long quiz question with no name keyword at all", () => {
+      const sanitized = sanitizeMappings(
+        [
+          field(
+            0,
+            "Given the formula below for light speed travel, Han Solo did the Kessel Run in how many parsecs? 3 points"
+          ),
+        ],
+        [fill(0, "firstName")]
+      );
+      expect(sanitized[0]).toMatchObject({ actionType: "skip" });
+    });
+
+    it("skips fullName on a long question about a third party", () => {
+      const sanitized = sanitizeMappings(
+        [field(0, "The latest villain, Kylo Ren, what is his real name? 1 point")],
+        [fill(0, "fullName")]
+      );
+      expect(sanitized[0]).toMatchObject({ actionType: "skip" });
+    });
+
+    it("STILL allows fullName when the question says 'your' (user-targeted)", () => {
+      const m = fill(0, "fullName");
+      expect(
+        sanitizeMappings(
+          [field(0, "What is your full legal name as it appears on your passport?")],
+          [m]
+        )
+      ).toEqual([m]);
+    });
+
+    it("STILL allows lastName on a plain 'Last name:' field (no false positive on length)", () => {
+      const m = fill(0, "lastName");
+      expect(sanitizeMappings([field(0, "Last name:")], [m])).toEqual([m]);
+    });
+
+    it("STILL allows lastName on a question 'What is your last name?'", () => {
+      const m = fill(0, "lastName");
+      expect(
+        sanitizeMappings([field(0, "What is your last name?")], [m])
+      ).toEqual([m]);
+    });
+  });
+
   describe("LLM-generated promptText normalisation", () => {
     it("normalises 'What's your date:?' into 'What's your Date?'", () => {
       const sanitized = sanitizeMappings(

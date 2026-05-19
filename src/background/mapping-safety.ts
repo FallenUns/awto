@@ -78,7 +78,15 @@ const INTENT_RULES: IntentRule[] = [
   { patterns: [/\bfirst\s*name\b/, /\bgiven\s*name\b/, /\bforename\b/], allow: ["firstName"] },
   { patterns: [/\bmiddle\s*name\b/], allow: ["middleName"] },
   { patterns: [/\blast\s*name\b/, /\bfamily\s*name\b/, /\bsurname\b/], allow: ["lastName"] },
-  { patterns: [/\bfull\s*name\b/, /\byour\s*name\b/, /\bcustomer\s*name\b/], allow: ["fullName"] },
+  {
+    patterns: [
+      /\bfull\s*name\b/,
+      /\byour\s*name\b/,
+      /\bcustomer\s*name\b/,
+      /\byour\s+(\w+\s+){1,4}name\b/,
+    ],
+    allow: ["fullName"],
+  },
   { patterns: [/^\s*name\s*[:*]?\s*$/i, /^\s*name\s*\*?\s*$/i], allow: ["fullName", "firstName", "lastName"] },
   { patterns: [/\bcompany\b/, /\bemployer\b/], allow: ["currentEmployer"] },
   { patterns: [/\bposition\b/, /\bjob\s*title\b/], allow: ["jobTitle"] },
@@ -126,6 +134,13 @@ export function sanitizeMappings(
 function decide(field: ScannedField, profileKey: string): Decision {
   if (field.type === "password") {
     return { kind: "skip", reason: "Sensitive credential — fill manually" };
+  }
+
+  if (looksLikeThirdPartyQuestion(field) && REQUIRE_LABEL_MATCH[profileKey]) {
+    return {
+      kind: "skip",
+      reason: "Looks like a question about someone else — skipped",
+    };
   }
 
   const signal = fieldSignal(field);
@@ -257,6 +272,14 @@ function normalizeSignal(value: string): string {
       .replace(/[-_./:[\]"'=#>]+/g, " ")
       .toLowerCase()
   );
+}
+
+function looksLikeThirdPartyQuestion(field: ScannedField): boolean {
+  const label = (field.label ?? "").trim();
+  if (label.length < 30) return false;
+  if (!/\?/.test(label)) return false;
+  if (/\byour\b/i.test(label)) return false;
+  return true;
 }
 
 function normalizeSpaces(value: string): string {
