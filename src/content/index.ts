@@ -3,6 +3,9 @@ import { scanFields } from "./form-scanner";
 import { fillFields } from "./form-filler";
 import { startDetector } from "./detector";
 import { mountWidget } from "./widget";
+import { hydrateAriaSettings } from "./aria-settings";
+
+void hydrateAriaSettings();
 
 const widget = mountWidget(async () => {
   const reply = (await chrome.runtime.sendMessage({
