@@ -190,4 +190,41 @@ describe("startDetector", () => {
     vi.advanceTimersByTime(300);
     expect(onChange).toHaveBeenCalledWith(0);
   });
+
+  it("triggers on an ARIA-only Google-Forms-style survey (age + gender radiogroups)", () => {
+    document.body.innerHTML = `
+      <main>
+        <div id="lbl-age">Age</div>
+        <div role="radiogroup" aria-labelledby="lbl-age">
+          <div role="radio">18-25</div>
+          <div role="radio">26-35</div>
+        </div>
+        <div id="lbl-g">Gender</div>
+        <div role="radiogroup" aria-labelledby="lbl-g">
+          <div role="radio">Male</div>
+          <div role="radio">Female</div>
+        </div>
+      </main>
+    `;
+    const onChange = vi.fn();
+    startDetector(onChange);
+    vi.advanceTimersByTime(300);
+    expect(onChange).toHaveBeenCalledWith(2);
+  });
+
+  it("still rejects a single ARIA radiogroup with no other personal signal", () => {
+    document.body.innerHTML = `
+      <main>
+        <div id="lbl-age">Age</div>
+        <div role="radiogroup" aria-labelledby="lbl-age">
+          <div role="radio">18-25</div>
+          <div role="radio">26-35</div>
+        </div>
+      </main>
+    `;
+    const onChange = vi.fn();
+    startDetector(onChange);
+    vi.advanceTimersByTime(300);
+    expect(onChange).toHaveBeenCalledWith(0);
+  });
 });

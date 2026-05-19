@@ -7,7 +7,7 @@ const SKIP_PROTOCOLS = ["chrome:", "chrome-extension:", "about:", "view-source:"
 
 type Category = "name" | "address" | "contact" | "personal" | "legal" | "work" | "web";
 
-const STRONG_CATEGORIES = new Set<Category>(["name", "address"]);
+const STRONG_CATEGORIES = new Set<Category>(["name", "address", "personal"]);
 
 const CATEGORY_KEYWORDS: Record<Category, string[]> = {
   name: [
@@ -43,14 +43,15 @@ const SEARCH_KEYWORDS = [
   "go to file", "jump to",
 ];
 
-const TEXT_LIKE_TYPES = new Set([
+const COUNTED_TYPES = new Set([
   "text", "email", "tel", "number", "url", "textarea", "select",
+  "radio", "checkbox",
 ]);
 
 const EXCLUDED_CONTAINER_TAGS = ["NAV", "HEADER", "FOOTER", "ASIDE"];
 
-function isTextLike(type: string): boolean {
-  return TEXT_LIKE_TYPES.has(type.toLowerCase());
+function isCountedType(type: string): boolean {
+  return COUNTED_TYPES.has(type.toLowerCase());
 }
 
 function isInExcludedContainer(selector: string): boolean {
@@ -78,7 +79,7 @@ function categoryFor(field: ScannedField): Category | null {
 }
 
 function evaluateFields(fields: ScannedField[]): number {
-  const personalFields = fields.filter((f) => isTextLike(f.type));
+  const personalFields = fields.filter((f) => isCountedType(f.type));
   const categories = new Set<Category>();
   let personalCount = 0;
   for (const field of personalFields) {
@@ -93,10 +94,7 @@ function evaluateFields(fields: ScannedField[]): number {
   if (personalCount < 2) return 0;
 
   const hasStrong = Array.from(categories).some((c) => STRONG_CATEGORIES.has(c));
-  if (hasStrong) {
-    if (categories.size >= 2 || personalCount >= 3) return fields.length;
-    return 0;
-  }
+  if (hasStrong) return fields.length;
   if (categories.size >= 3) return fields.length;
   return 0;
 }
