@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { fillFields } from "./form-filler";
+import { fillFields, fillAriaWidget } from "./form-filler";
 
 function setBody(html: string): void {
   document.body.innerHTML = html;
@@ -374,5 +374,22 @@ describe("fillFields select fuzzy match", () => {
     const result = fillFields(document, [{ selector: "#month", value: "Jan" }]);
     expect(result.filled).toBe(1);
     expect((document.querySelector("#month") as HTMLSelectElement).value).toBe("01");
+  });
+});
+
+describe("fillAriaWidget — textbox", () => {
+  it("writes textContent and dispatches an input event", async () => {
+    document.body.innerHTML = `<div id="t" role="textbox" contenteditable="true"></div>`;
+    const el = document.getElementById("t") as HTMLElement;
+    const events: string[] = [];
+    el.addEventListener("input", (e) =>
+      events.push(`input:${(e as InputEvent).inputType ?? ""}`)
+    );
+
+    const result = await fillAriaWidget(el, "Patrick");
+
+    expect(result).toMatchObject({ filled: true });
+    expect(el.textContent).toBe("Patrick");
+    expect(events).toEqual(["input:insertText"]);
   });
 });

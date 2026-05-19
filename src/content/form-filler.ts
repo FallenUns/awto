@@ -118,6 +118,32 @@ export function fillFields(
   return { filled, failed };
 }
 
+export async function fillAriaWidget(
+  el: HTMLElement,
+  value: string
+): Promise<{ filled: boolean; reason?: string }> {
+  const role = el.getAttribute("role");
+  if (role === "textbox") return fillAriaTextbox(el, value);
+  return { filled: false, reason: "unsupported aria role" };
+}
+
+function fillAriaTextbox(
+  el: HTMLElement,
+  value: string
+): { filled: boolean } {
+  el.focus();
+  el.textContent = value;
+  el.dispatchEvent(
+    new InputEvent("input", {
+      bubbles: true,
+      inputType: "insertText",
+      data: value,
+    })
+  );
+  el.blur();
+  return { filled: true };
+}
+
 function isSemanticallyUnsafeFill(
   el: Element,
   profileKey: string | undefined
