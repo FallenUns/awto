@@ -23,6 +23,8 @@ const EXCLUDED_TYPES = new Set([
   "button",
   "image",
   "file",
+  "color",
+  "range",
 ]);
 
 type Fillable =
@@ -144,6 +146,7 @@ export function scanFields(
         if (containsAny(el, nativeElements)) continue;
         if (isHidden(el)) continue;
         if (el.getAttribute("aria-disabled") === "true") continue;
+        if (el.getAttribute("aria-readonly") === "true") continue;
         if (q.skipIfInside && el.closest(q.skipIfInside)) continue;
 
         const options = q.collectOptions?.(el);
@@ -228,11 +231,26 @@ function isHidden(el: HTMLElement): boolean {
   let cur: HTMLElement | null = el;
   while (cur) {
     if (cur.getAttribute("aria-hidden") === "true") return true;
-    const style = cur.style;
-    if (style && (style.display === "none" || style.visibility === "hidden")) {
+    if (cur.hasAttribute("hidden")) return true;
+    const inlineStyle = cur.style;
+    if (
+      inlineStyle &&
+      (inlineStyle.display === "none" || inlineStyle.visibility === "hidden")
+    ) {
       return true;
     }
     cur = cur.parentElement;
+  }
+  const view = el.ownerDocument?.defaultView;
+  if (view && typeof view.getComputedStyle === "function") {
+    try {
+      const computed = view.getComputedStyle(el);
+      if (computed.display === "none" || computed.visibility === "hidden") {
+        return true;
+      }
+    } catch {
+      // getComputedStyle can throw on detached elements; treat as visible
+    }
   }
   return false;
 }

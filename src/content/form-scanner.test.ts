@@ -730,3 +730,51 @@ describe("ARIA respects disabled flag", () => {
     }
   });
 });
+
+describe("scanFields — excluded element types", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("excludes <input type=color>", () => {
+    document.body.innerHTML = `
+      <form>
+        <input id="email" type="email" />
+        <input id="c" type="color" />
+      </form>
+    `;
+    const fields = scanFields(document);
+    expect(fields.map((f) => f.type)).toEqual(["email"]);
+  });
+
+  it("excludes <input type=range>", () => {
+    document.body.innerHTML = `
+      <form>
+        <input id="email" type="email" />
+        <input id="r" type="range" min="0" max="100" />
+      </form>
+    `;
+    const fields = scanFields(document);
+    expect(fields.map((f) => f.type)).toEqual(["email"]);
+  });
+
+  it("skips ARIA widgets with aria-readonly=true", () => {
+    document.body.innerHTML = `
+      <div id="lbl">Comment</div>
+      <div role="textbox" contenteditable="true" aria-labelledby="lbl" aria-readonly="true">Read only</div>
+    `;
+    expect(scanFields(document)).toEqual([]);
+  });
+
+  it("skips inputs hidden via class-based display:none (computed style check)", () => {
+    document.body.innerHTML = `
+      <style>.hide{display:none}</style>
+      <form>
+        <input class="hide" id="hidden-fn" type="text" name="firstname" />
+        <input id="visible-email" type="email" name="email" />
+      </form>
+    `;
+    const fields = scanFields(document);
+    expect(fields.map((f) => f.selector)).toEqual(["#visible-email"]);
+  });
+});
