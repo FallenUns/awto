@@ -1,5 +1,6 @@
 import type { ScannedField } from "@/shared/messages";
 import { isAriaScanEnabled } from "./aria-settings";
+import { readComboboxValue } from "./combobox";
 
 const TEXT_LIKE_TYPES = new Set([
   "text",
@@ -37,6 +38,8 @@ interface AriaQuery {
   type: string;
   collectOptions?: (el: HTMLElement) => string[];
   skipIfInside?: string;
+  requireOptions?: boolean;
+  isDropdown?: boolean;
 }
 
 function collectRoleOptions(el: HTMLElement, role: string): string[] {
@@ -50,6 +53,7 @@ const ARIA_QUERIES: AriaQuery[] = [
     selector: '[role="radiogroup"]',
     type: "radio",
     collectOptions: (el) => collectRoleOptions(el, "radio"),
+    requireOptions: true,
   },
   { selector: '[role="checkbox"]', type: "checkbox" },
   { selector: '[role="textbox"][contenteditable="true"]', type: "text" },
@@ -57,12 +61,14 @@ const ARIA_QUERIES: AriaQuery[] = [
     selector: '[role="combobox"]',
     type: "select",
     collectOptions: (el) => collectRoleOptions(el, "option"),
+    isDropdown: true,
   },
   {
     selector: '[role="listbox"]',
     type: "select",
     collectOptions: (el) => collectRoleOptions(el, "option"),
     skipIfInside: '[role="combobox"]',
+    isDropdown: true,
   },
 ];
 
@@ -150,17 +156,26 @@ export function scanFields(
         if (q.skipIfInside && el.closest(q.skipIfInside)) continue;
 
         const options = q.collectOptions?.(el);
-        if (q.collectOptions && (!options || options.length === 0)) continue;
+        if (q.requireOptions && (!options || options.length === 0)) continue;
 
-        fields.push({
+        const ariaField: ScannedField = {
           id: nextId++,
           selector: buildAriaSelector(el, ownerDoc),
           label: extractAriaLabel(el, ownerDoc),
           placeholder: null,
           type: q.type,
           required: el.getAttribute("aria-required") === "true",
-          ...(options ? { options } : {}),
-        });
+          ...(options && options.length > 0 ? { options } : {}),
+        };
+
+        if (q.isDropdown) {
+          const { value, placeholder } = readComboboxValue(el);
+          if (value) ariaField.currentValue = value;
+          if (placeholder) ariaField.placeholder = placeholder;
+          if (!ariaField.label && placeholder) ariaField.label = placeholder;
+        }
+
+        fields.push(ariaField);
         claimed.add(el);
       }
     }

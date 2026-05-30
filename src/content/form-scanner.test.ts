@@ -731,6 +731,47 @@ describe("ARIA respects disabled flag", () => {
   });
 });
 
+describe("ARIA combobox without inline options (closed dropdown)", () => {
+  it("captures a role=combobox whose options are not yet rendered", () => {
+    document.body.innerHTML = `
+      <div class="air3-dropdown" id="country-dd">
+        <div role="combobox" aria-expanded="false" aria-controls="dropdown-menu"
+             aria-required="true" class="air3-dropdown-toggle">
+          <span class="air3-dropdown-toggle-label">Select a Country</span>
+        </div>
+      </div>
+      <div id="dropdown-menu"></div>
+    `;
+    const fields = scanFields();
+    expect(fields).toHaveLength(1);
+    expect(fields[0]).toMatchObject({ type: "select", required: true });
+  });
+
+  it("uses the placeholder text as the label when no other label exists", () => {
+    document.body.innerHTML = `
+      <div role="combobox" aria-controls="m">
+        <span class="air3-dropdown-toggle-label">Select a Country</span>
+      </div>
+      <div id="m"></div>
+    `;
+    const f = scanFields()[0];
+    expect(f?.label).toBe("Select a Country");
+    expect(f?.placeholder).toBe("Select a Country");
+    expect(f?.currentValue).toBeUndefined();
+  });
+
+  it("captures the current value of an already-selected combobox", () => {
+    document.body.innerHTML = `
+      <div role="combobox" aria-controls="m">
+        <span class="air3-dropdown-toggle-label">Australia</span>
+      </div>
+      <div id="m"></div>
+    `;
+    const f = scanFields()[0];
+    expect(f?.currentValue).toBe("Australia");
+  });
+});
+
 describe("scanFields — excluded element types", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
