@@ -1,5 +1,6 @@
 import type { Profile } from "./profile";
 import type { FieldMapping } from "./mapping";
+import type { ConsentLink, ConsentDecision } from "./consent";
 
 export interface ScannedField {
   id: number;
@@ -10,6 +11,8 @@ export interface ScannedField {
   required: boolean;
   options?: string[];
   autocomplete?: string;
+  currentValue?: string;
+  links?: ConsentLink[];
 }
 
 export interface FillValue {
@@ -30,6 +33,7 @@ export type AwtoMessage =
       bypassCache?: boolean;
     }
   | { type: "mapFieldsProgress"; mappings: FieldMapping[] }
+  | { type: "mapFieldsConsent"; consent: ConsentDecision[] }
   | {
       type: "mapFieldsComplete";
       mappings: FieldMapping[];
