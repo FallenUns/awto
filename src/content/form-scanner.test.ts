@@ -879,3 +879,27 @@ describe("scanFields — excluded element types", () => {
     expect(fields.map((f) => f.selector)).toEqual(["#visible-email"]);
   });
 });
+
+describe("phone dial-code combobox exclusion", () => {
+  it("excludes a phone country-code (dial) combobox", () => {
+    document.body.innerHTML = `
+      <div role="combobox" aria-controls="m">
+        <span class="air3-dropdown-toggle-label"><span class="sr-only">Country code Australia +61</span></span>
+      </div>
+      <div id="m"></div>
+    `;
+    expect(scanFields()).toEqual([]);
+  });
+
+  it("still captures a plain Country combobox", () => {
+    document.body.innerHTML = `
+      <span id="cl">Country</span>
+      <div role="combobox" aria-labelledby="cl">
+        <span class="air3-dropdown-toggle-label">Australia</span>
+      </div>
+    `;
+    const fields = scanFields();
+    expect(fields).toHaveLength(1);
+    expect(fields[0]).toMatchObject({ type: "select", label: "Country" });
+  });
+});

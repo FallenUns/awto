@@ -224,6 +224,12 @@ function isNonFillableDropdown(el: HTMLElement): boolean {
     }`;
     if (SEARCH_RE.test(hint)) return true;
   }
+
+  // Phone dial-code pickers (e.g. "Country code Australia +61") are part of a phone
+  // widget, not a fillable value selector — a country name must never go into them.
+  const text = (el.textContent ?? "").replace(/\s+/g, " ").toLowerCase();
+  if (/\bcountry code\b|\bdial code\b/.test(text)) return true;
+
   return false;
 }
 
