@@ -70,6 +70,13 @@ const ARIA_QUERIES: AriaQuery[] = [
     skipIfInside: '[role="combobox"]',
     isDropdown: true,
   },
+  {
+    selector:
+      '[aria-haspopup="listbox"]:not([role="combobox"]):not([role="listbox"])',
+    type: "select",
+    collectOptions: (el) => collectRoleOptions(el, "option"),
+    isDropdown: true,
+  },
 ];
 
 export function scanFields(
@@ -154,6 +161,7 @@ export function scanFields(
         if (el.getAttribute("aria-disabled") === "true") continue;
         if (el.getAttribute("aria-readonly") === "true") continue;
         if (q.skipIfInside && el.closest(q.skipIfInside)) continue;
+        if (q.isDropdown && isNonFillableDropdown(el)) continue;
 
         const options = q.collectOptions?.(el);
         if (q.requireOptions && (!options || options.length === 0)) continue;
@@ -182,6 +190,30 @@ export function scanFields(
   }
 
   return fields;
+}
+
+const SEARCH_RE = /\bsearch\b/i;
+
+function isNonFillableDropdown(el: HTMLElement): boolean {
+  const haspopup = el.getAttribute("aria-haspopup");
+  if (haspopup && haspopup !== "listbox" && haspopup !== "true") return true;
+
+  const doc = el.ownerDocument ?? document;
+  const controlsId =
+    el.getAttribute("aria-controls") ?? el.getAttribute("aria-owns");
+  if (controlsId) {
+    const target = doc.getElementById(controlsId);
+    if (target?.getAttribute("role") === "menu") return true;
+  }
+
+  const autocomplete = el.getAttribute("aria-autocomplete");
+  if (autocomplete === "list" || autocomplete === "both") {
+    const hint = `${el.getAttribute("aria-label") ?? ""} ${
+      el.getAttribute("placeholder") ?? ""
+    }`;
+    if (SEARCH_RE.test(hint)) return true;
+  }
+  return false;
 }
 
 function isEligible(el: Fillable): boolean {

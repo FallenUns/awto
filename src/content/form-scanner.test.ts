@@ -772,6 +772,41 @@ describe("ARIA combobox without inline options (closed dropdown)", () => {
   });
 });
 
+describe("custom dropdown exclusions", () => {
+  it("captures an aria-haspopup=listbox trigger that is not a combobox", () => {
+    document.body.innerHTML = `
+      <span id="lbl">Title</span>
+      <button aria-haspopup="listbox" aria-labelledby="lbl">Mr</button>
+    `;
+    const fields = scanFields();
+    expect(fields).toHaveLength(1);
+    expect(fields[0]).toMatchObject({ type: "select", label: "Title" });
+  });
+
+  it("excludes a command menu (aria-haspopup=menu)", () => {
+    document.body.innerHTML = `
+      <div role="combobox" aria-haspopup="menu" aria-controls="m">Actions</div>
+      <div id="m" role="menu"><div role="menuitem">Delete</div></div>
+    `;
+    expect(scanFields()).toEqual([]);
+  });
+
+  it("excludes a combobox whose popup is a role=menu", () => {
+    document.body.innerHTML = `
+      <div role="combobox" aria-controls="m">Sort</div>
+      <ul id="m" role="menu"><li role="menuitem">Newest</li></ul>
+    `;
+    expect(scanFields()).toEqual([]);
+  });
+
+  it("excludes a search combobox", () => {
+    document.body.innerHTML = `
+      <div role="combobox" aria-autocomplete="list" aria-label="Search products"></div>
+    `;
+    expect(scanFields()).toEqual([]);
+  });
+});
+
 describe("scanFields — excluded element types", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
