@@ -197,3 +197,39 @@ describe("LLMSettings.enableAriaForms", () => {
     expect(settings.enableAriaForms).toBe(false);
   });
 });
+
+describe("marketing consent preference", () => {
+  beforeEach(() => {
+    installChromeMock();
+  });
+
+  it("defaults to optIn when unset", async () => {
+    (chrome.storage.local.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({});
+    const { getMarketingConsent } = await import("./storage");
+    expect(await getMarketingConsent()).toBe("optIn");
+  });
+
+  it("round-trips a stored optOut", async () => {
+    (chrome.storage.local.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      "awto:consent": { marketing: "optOut" },
+    });
+    const { getMarketingConsent } = await import("./storage");
+    expect(await getMarketingConsent()).toBe("optOut");
+  });
+
+  it("setMarketingConsent writes the awto:consent key", async () => {
+    const { setMarketingConsent } = await import("./storage");
+    await setMarketingConsent("optOut");
+    expect(chrome.storage.local.set).toHaveBeenCalledWith({
+      "awto:consent": { marketing: "optOut" },
+    });
+  });
+
+  it("returns optIn when storage throws", async () => {
+    (chrome.storage.local.get as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("storage gone")
+    );
+    const { getMarketingConsent } = await import("./storage");
+    expect(await getMarketingConsent()).toBe("optIn");
+  });
+});

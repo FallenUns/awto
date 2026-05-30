@@ -23,6 +23,7 @@ export const DEFAULT_LLM_SETTINGS: LLMSettings = LLMSettingsSchema.parse({});
 
 const KEY_PROFILE = "awto:profile";
 const KEY_LLM = "awto:llm";
+const KEY_CONSENT = "awto:consent";
 
 async function readKey(key: string): Promise<unknown> {
   const result = await chrome.storage.local.get(key);
@@ -53,4 +54,24 @@ export async function loadLLMSettings(): Promise<LLMSettings> {
 
 export async function saveLLMSettings(settings: LLMSettings): Promise<void> {
   await writeKey(KEY_LLM, settings);
+}
+
+const ConsentPrefsSchema = z.object({
+  marketing: z.enum(["optIn", "optOut"]).default("optIn"),
+});
+
+export async function getMarketingConsent(): Promise<"optIn" | "optOut"> {
+  try {
+    const raw = await readKey(KEY_CONSENT);
+    const parsed = ConsentPrefsSchema.safeParse(raw);
+    return parsed.success ? parsed.data.marketing : "optIn";
+  } catch {
+    return "optIn";
+  }
+}
+
+export async function setMarketingConsent(
+  value: "optIn" | "optOut"
+): Promise<void> {
+  await writeKey(KEY_CONSENT, { marketing: value });
 }
