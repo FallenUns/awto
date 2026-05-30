@@ -293,10 +293,13 @@ async function keyboardSelect(el: HTMLElement, value: string): Promise<boolean> 
   pressKey(el, "Enter");
   await waitFrame();
   const after = readComboboxValue(el).value;
-  if (after === null || !valueMatches(after, value)) {
-    fireOpen(match);
-  }
-  return true;
+  if (after !== null && valueMatches(after, value)) return true;
+  // Enter didn't visibly take — try a direct click, then re-verify. A concrete
+  // mismatch after both attempts is reported as a failure, never a wrong-fill.
+  fireOpen(match);
+  await waitFrame();
+  const confirmed = readComboboxValue(el).value;
+  return confirmed === null || valueMatches(confirmed, value);
 }
 
 function pressKey(el: HTMLElement, key: string): void {
