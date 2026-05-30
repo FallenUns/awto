@@ -1,4 +1,5 @@
 import type { ScannedField } from "@/shared/messages";
+import type { ConsentLink } from "@/shared/consent";
 import { isAriaScanEnabled } from "./aria-settings";
 import { readComboboxValue } from "./combobox";
 
@@ -143,6 +144,11 @@ export function scanFields(
       );
     }
 
+    if (type === "checkbox") {
+      const links = collectConsentLinks(el, ownerDoc);
+      if (links.length > 0) field.links = links;
+    }
+
     fields.push(field);
   }
 
@@ -181,6 +187,11 @@ export function scanFields(
           if (value) ariaField.currentValue = value;
           if (placeholder) ariaField.placeholder = placeholder;
           if (!ariaField.label && placeholder) ariaField.label = placeholder;
+        }
+
+        if (q.type === "checkbox") {
+          const links = collectConsentLinks(el, ownerDoc);
+          if (links.length > 0) ariaField.links = links;
         }
 
         fields.push(ariaField);
@@ -607,6 +618,36 @@ function matchesOne(doc: Document, selector: string): boolean {
   } catch {
     return false;
   }
+}
+
+function findLabelContainer(el: Element, doc: Document): Element | null {
+  const id = el.getAttribute("id");
+  if (id) {
+    const explicit = doc.querySelector(`label[for="${cssEscape(id)}"]`);
+    if (explicit) return explicit;
+  }
+  const wrapper = el.closest("label");
+  if (wrapper) return wrapper;
+  const labelledBy = el.getAttribute("aria-labelledby");
+  if (labelledBy) {
+    const first = labelledBy.split(/\s+/).filter(Boolean)[0];
+    if (first) {
+      const target = doc.getElementById(first);
+      if (target) return target;
+    }
+  }
+  return null;
+}
+
+function collectConsentLinks(el: Element, doc: Document): ConsentLink[] {
+  const container = findLabelContainer(el, doc);
+  if (!container) return [];
+  return Array.from(container.querySelectorAll("a[href]"))
+    .map((a) => ({
+      text: (a.textContent ?? "").replace(/\s+/g, " ").trim(),
+      href: a.getAttribute("href") ?? "",
+    }))
+    .filter((l) => l.text.length > 0);
 }
 
 function extractAriaLabel(el: HTMLElement, doc: Document): string {

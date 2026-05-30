@@ -807,6 +807,31 @@ describe("custom dropdown exclusions", () => {
   });
 });
 
+describe("consent link capture", () => {
+  it("captures anchors inside a native checkbox label", () => {
+    document.body.innerHTML = `
+      <label>
+        <input type="checkbox" />
+        Yes, I agree to the
+        <a href="https://x.com/terms">Terms of Service</a> and
+        <a href="https://x.com/privacy">Privacy Policy</a>.
+      </label>
+    `;
+    const f = scanFields()[0];
+    expect(f?.type).toBe("checkbox");
+    expect(f?.links).toEqual([
+      { text: "Terms of Service", href: "https://x.com/terms" },
+      { text: "Privacy Policy", href: "https://x.com/privacy" },
+    ]);
+  });
+
+  it("omits links when the checkbox label has none", () => {
+    document.body.innerHTML = `<label><input type="checkbox" /> Remember me</label>`;
+    const f = scanFields()[0];
+    expect(f?.links).toBeUndefined();
+  });
+});
+
 describe("scanFields — excluded element types", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
