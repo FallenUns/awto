@@ -12,8 +12,9 @@ import {
   setProfileValue,
   type Profile,
 } from "@/shared/profile";
-import { loadProfile, saveProfile } from "@/shared/storage";
+import { loadProfile, saveProfile, setMarketingConsent } from "@/shared/storage";
 import type {
+  ConsentRow,
   FailedFill,
   FillRow,
   FlowState,
@@ -29,6 +30,7 @@ export interface UseAwtoFlowDeps {
   _loadProfile?: () => Promise<Profile>;
   _saveProfile?: (profile: Profile) => Promise<void>;
   _closePopup?: () => void;
+  _setMarketingConsent?: (v: "optIn" | "optOut") => Promise<void>;
 }
 
 const INITIAL_STATE: FlowState = {
@@ -40,6 +42,7 @@ const INITIAL_STATE: FlowState = {
   fillRows: [],
   missingRows: [],
   skippedRows: [],
+  consentRows: [],
   filledCount: 0,
   failedFills: [],
   chunksCompleted: 0,
@@ -124,6 +127,7 @@ export interface UseAwtoFlowResult {
   status: FlowStatus;
   setOverrideValue: (fieldId: number, value: string) => void;
   setMissingValue: (fieldId: number, value: string) => void;
+  setConsentChecked: (fieldId: number, checked: boolean) => void;
   fill: () => Promise<void>;
   retry: () => void;
   cancel: () => void;
@@ -138,6 +142,7 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
   const loadProfileFn = deps._loadProfile ?? loadProfile;
   const saveProfileFn = deps._saveProfile ?? saveProfile;
   const closePopup = deps._closePopup ?? defaultClosePopup;
+  const setMarketingConsentFn = deps._setMarketingConsent ?? setMarketingConsent;
 
   const [state, setState] = useState<FlowState>(INITIAL_STATE);
   const [runId, setRunId] = useState(0);
@@ -166,7 +171,7 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
           msg.mappings,
           profile
         );
-        setState({
+        setState((s) => ({
           status: "ready",
           error: null,
           fields,
@@ -175,10 +180,23 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
           fillRows,
           missingRows,
           skippedRows,
+          consentRows: s.consentRows,
           filledCount: 0,
           failedFills: [],
           chunksCompleted: 0,
-        });
+        }));
+      } else if (msg.type === "mapFieldsConsent") {
+        setState((s) => ({
+          ...s,
+          consentRows: msg.consent.map((c) => ({
+            fieldId: c.fieldId,
+            selector: c.selector,
+            label: c.label,
+            consentType: c.consentType,
+            checked: c.proposedChecked,
+            links: c.links,
+          })) as ConsentRow[],
+        }));
       } else if (msg.type === "mapFieldsProgress") {
         const profile = profileRef.current;
         const fields = fieldsRef.current;
@@ -339,6 +357,15 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
     }));
   }, []);
 
+  const setConsentChecked = useCallback((fieldId: number, checked: boolean) => {
+    setState((s) => ({
+      ...s,
+      consentRows: s.consentRows.map((row) =>
+        row.fieldId === fieldId ? { ...row, checked } : row
+      ),
+    }));
+  }, []);
+
   const fill = useCallback(async () => {
     const tabId = tabIdRef.current;
     if (tabId === null) return;
@@ -375,6 +402,22 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
         });
         nextProfile = setProfileValue(nextProfile, row.suggestedKey, trimmed);
         profileChanged = true;
+      }
+
+      for (const row of current.consentRows) {
+        values.push({
+          selector: row.selector,
+          value: row.checked ? "true" : "false",
+          label: row.label,
+        });
+      }
+      const marketingRows = current.consentRows.filter(
+        (row) => row.consentType === "marketing"
+      );
+      if (marketingRows.length > 0) {
+        await setMarketingConsentFn(
+          marketingRows.some((row) => row.checked) ? "optIn" : "optOut"
+        );
       }
 
       if (profileChanged) {
@@ -451,6 +494,7 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
       fillRows: [],
       missingRows: [],
       skippedRows: [],
+      consentRows: [],
       mappings: [],
       failedFills: [],
       chunksCompleted: 0,
@@ -470,6 +514,7 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
     status: state.status,
     setOverrideValue,
     setMissingValue,
+    setConsentChecked,
     fill,
     retry,
     cancel,

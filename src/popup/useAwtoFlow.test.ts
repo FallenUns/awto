@@ -771,6 +771,65 @@ describe("useAwtoFlow", () => {
     expect(result.current.status).toBe("mapping");
   });
 
+  const sampleConsent = [
+    { fieldId: 5, selector: "#promo", label: "Send me emails", consentType: "marketing" as const, proposedChecked: true },
+    { fieldId: 6, selector: "#terms", label: "I agree", consentType: "legal" as const, proposedChecked: false },
+  ];
+
+  it("populates consentRows from a mapFieldsConsent message", async () => {
+    const deps = makeDeps();
+    const { result } = renderFlow(deps);
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+
+    await act(async () => {
+      deps.portHandle.autoReply({ type: "mapFieldsConsent", consent: sampleConsent });
+    });
+
+    expect(result.current.state.consentRows).toEqual([
+      { fieldId: 5, selector: "#promo", label: "Send me emails", consentType: "marketing", checked: true, links: undefined },
+      { fieldId: 6, selector: "#terms", label: "I agree", consentType: "legal", checked: false, links: undefined },
+    ]);
+  });
+
+  it("fill() sends consent toggle values and persists the marketing preference", async () => {
+    const setMarketingConsent = vi.fn().mockResolvedValue(undefined);
+    const deps = makeDeps();
+    const { result } = renderHook(() =>
+      useAwtoFlow({
+        _queryActiveTab: deps.queryActiveTab,
+        _sendToTab: deps.sendToTab,
+        _connect: deps.connect as unknown as typeof chrome.runtime.connect,
+        _loadProfile: deps.loadProfile,
+        _saveProfile: deps.saveProfile,
+        _closePopup: deps.closePopup,
+        _setMarketingConsent: setMarketingConsent,
+      })
+    );
+
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+    await act(async () => {
+      deps.portHandle.autoReply({ type: "mapFieldsConsent", consent: sampleConsent });
+    });
+    act(() => result.current.setConsentChecked(5, false));
+    act(() => result.current.setConsentChecked(6, true));
+
+    await act(async () => {
+      await result.current.fill();
+    });
+
+    const fillCall = deps.sendToTab.mock.calls.find(
+      (c) => (c[1] as AwtoMessage).type === "fillForm"
+    );
+    const fillMsg = fillCall![1] as AwtoMessage & { type: "fillForm" };
+    expect(fillMsg.values).toEqual(
+      expect.arrayContaining([
+        { selector: "#promo", value: "false", label: "Send me emails" },
+        { selector: "#terms", value: "true", label: "I agree" },
+      ])
+    );
+    expect(setMarketingConsent).toHaveBeenCalledWith("optOut");
+  });
+
   it("disconnects the port on unmount", async () => {
     let disconnected = false;
     const port = {
