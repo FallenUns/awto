@@ -639,3 +639,47 @@ describe("fillAriaWidget — combobox with portal options", () => {
     expect(clickedIn2).toBe("");
   });
 });
+
+describe("fillAriaListbox — hardened", () => {
+  it("confirms success when the toggle label updates to the chosen value", async () => {
+    document.body.innerHTML = `
+      <div id="c" role="combobox" aria-controls="m">
+        <span class="air3-dropdown-toggle-label">Select a Country</span>
+      </div>
+      <div id="m">
+        <div role="option">Australia</div>
+        <div role="option">Austria</div>
+      </div>
+    `;
+    const combobox = document.getElementById("c") as HTMLElement;
+    const label = combobox.querySelector(".air3-dropdown-toggle-label") as HTMLElement;
+    document.querySelectorAll<HTMLElement>('#m [role="option"]').forEach((o) => {
+      o.addEventListener("click", () => {
+        label.textContent = o.textContent;
+      });
+    });
+
+    const result = await fillAriaWidget(combobox, "Australia");
+
+    expect(result).toMatchObject({ filled: true });
+    expect(label.textContent).toBe("Australia");
+  });
+
+  it("opens via a pointer/mouse sequence, not just .click()", async () => {
+    document.body.innerHTML = `
+      <div id="c" role="combobox" aria-controls="m"><span class="lbl">x</span></div>
+      <div id="m"><div role="option">Australia</div></div>
+    `;
+    const combobox = document.getElementById("c") as HTMLElement;
+    const seen: string[] = [];
+    for (const t of ["pointerdown", "mousedown", "click"]) {
+      combobox.addEventListener(t, () => seen.push(t));
+    }
+
+    await fillAriaWidget(combobox, "Australia");
+
+    expect(seen).toContain("pointerdown");
+    expect(seen).toContain("mousedown");
+    expect(seen).toContain("click");
+  });
+});

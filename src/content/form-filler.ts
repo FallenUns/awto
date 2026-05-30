@@ -1,4 +1,5 @@
 import type { FillValue } from "@/shared/messages";
+import { readComboboxValue } from "./combobox";
 
 export interface FillResult {
   filled: number;
@@ -210,25 +211,120 @@ async function fillAriaListbox(
   el: HTMLElement,
   value: string
 ): Promise<{ filled: boolean; reason?: string }> {
-  el.click();
-  await waitFrame();
-  const options = collectListboxOptions(el);
-  const exact = options.find(
-    (o) =>
-      (o.textContent ?? "").trim().toLowerCase() ===
-      value.trim().toLowerCase()
-  );
+  fireOpen(el);
+  const options = await waitForOptions(el, 1500);
+  const target = value.trim().toLowerCase();
   const match =
-    exact ??
-    options.find((o) =>
-      matchAriaOption(value, (o.textContent ?? "").trim())
-    );
-  if (!match) {
-    el.click();
-    return { filled: false, reason: "no matching option" };
+    options.find((o) => (o.textContent ?? "").trim().toLowerCase() === target) ??
+    options.find((o) => matchAriaOption(value, (o.textContent ?? "").trim()));
+
+  if (match) {
+    fireOpen(match);
+    await waitFrame();
+    const after = readComboboxValue(el).value;
+    if (after === null || valueMatches(after, value)) return { filled: true };
   }
-  match.click();
-  return { filled: true };
+
+  if (await keyboardSelect(el, value)) return { filled: true };
+
+  closeIfOpen(el);
+  return {
+    filled: false,
+    reason: match ? "could not select option" : "no matching option",
+  };
+}
+
+function fireOpen(el: HTMLElement): void {
+  const PointerCtor =
+    typeof PointerEvent === "function" ? PointerEvent : MouseEvent;
+  const opts = { bubbles: true, cancelable: true, button: 0 } as const;
+  el.dispatchEvent(new PointerCtor("pointerdown", opts));
+  el.dispatchEvent(new MouseEvent("mousedown", opts));
+  el.dispatchEvent(new PointerCtor("pointerup", opts));
+  el.dispatchEvent(new MouseEvent("mouseup", opts));
+  el.dispatchEvent(new MouseEvent("click", opts));
+}
+
+function waitForOptions(
+  trigger: HTMLElement,
+  timeout: number
+): Promise<HTMLElement[]> {
+  const find = () => collectListboxOptions(trigger);
+  return new Promise((resolve) => {
+    const immediate = find();
+    if (immediate.length > 0) {
+      resolve(immediate);
+      return;
+    }
+    if (typeof MutationObserver !== "function") {
+      resolve([]);
+      return;
+    }
+    const obs = new MutationObserver(() => {
+      const found = find();
+      if (found.length > 0) {
+        obs.disconnect();
+        resolve(found);
+      }
+    });
+    obs.observe(trigger.ownerDocument?.body ?? document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["aria-expanded"],
+    });
+    setTimeout(() => {
+      obs.disconnect();
+      resolve(find());
+    }, timeout);
+  });
+}
+
+async function keyboardSelect(el: HTMLElement, value: string): Promise<boolean> {
+  pressKey(el, "ArrowDown");
+  const options = await waitForOptions(el, 800);
+  if (options.length === 0) return false;
+  for (const ch of value.slice(0, 6)) pressKey(el, ch);
+  await waitFrame();
+  const match = collectListboxOptions(el).find((o) =>
+    matchAriaOption(value, (o.textContent ?? "").trim())
+  );
+  if (!match) return false;
+  pressKey(el, "Enter");
+  await waitFrame();
+  const after = readComboboxValue(el).value;
+  if (after === null || !valueMatches(after, value)) {
+    fireOpen(match);
+  }
+  return true;
+}
+
+function pressKey(el: HTMLElement, key: string): void {
+  for (const type of ["keydown", "keyup"] as const) {
+    el.dispatchEvent(
+      new KeyboardEvent(type, { key, bubbles: true, cancelable: true })
+    );
+  }
+}
+
+function valueMatches(actual: string, wanted: string): boolean {
+  const a = actual.trim().toLowerCase();
+  const w = wanted.trim().toLowerCase();
+  if (!a || !w) return false;
+  return (
+    a === w ||
+    a.includes(w) ||
+    w.includes(a) ||
+    matchAriaOption(wanted, actual)
+  );
+}
+
+function closeIfOpen(el: HTMLElement): void {
+  if (el.getAttribute("aria-expanded") === "true") {
+    el.dispatchEvent(
+      new MouseEvent("click", { bubbles: true, cancelable: true })
+    );
+  }
 }
 
 function collectListboxOptions(trigger: HTMLElement): HTMLElement[] {
