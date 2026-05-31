@@ -1,5 +1,6 @@
 import type { FieldMapping } from "@/shared/mapping";
 import type { ScannedField } from "@/shared/messages";
+import type { ConsentLink } from "@/shared/consent";
 
 export type FlowStatus =
   | "scanning"
@@ -34,6 +35,15 @@ export interface SkippedRow {
   reason: string;
 }
 
+export interface ConsentRow {
+  fieldId: number;
+  selector: string;
+  label: string;
+  consentType: "marketing" | "legal";
+  checked: boolean;
+  links?: ConsentLink[];
+}
+
 export interface FailedFill {
   fieldId: number;
   label: string;
@@ -49,6 +59,7 @@ export interface FlowState {
   fillRows: FillRow[];
   missingRows: MissingRow[];
   skippedRows: SkippedRow[];
+  consentRows: ConsentRow[];
   filledCount: number;
   failedFills: FailedFill[];
   chunksCompleted: number;

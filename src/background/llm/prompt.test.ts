@@ -328,3 +328,11 @@ describe("SYSTEM_PROMPT hard never-rules", () => {
     expect(SYSTEM_PROMPT.toLowerCase()).toMatch(/prefer skip|skip over fill/);
   });
 });
+
+describe("phone vs country-code rule", () => {
+  it("says type=tel is the phone number and never country", () => {
+    const p = SYSTEM_PROMPT.toLowerCase();
+    expect(p).toContain('type="tel"');
+    expect(p).toContain("never put a country");
+  });
+});

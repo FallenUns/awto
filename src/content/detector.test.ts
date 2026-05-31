@@ -227,4 +227,71 @@ describe("startDetector", () => {
     vi.advanceTimersByTime(300);
     expect(onChange).toHaveBeenCalledWith(0);
   });
+
+  it("excludes inputs under div role=banner (ARIA landmark)", () => {
+    document.body.innerHTML = `
+      <div role="banner">
+        <input type="email" placeholder="Subscribe email" />
+        <input type="text" placeholder="First name" />
+      </div>
+    `;
+    const onChange = vi.fn();
+    startDetector(onChange);
+    vi.advanceTimersByTime(300);
+    expect(onChange).toHaveBeenCalledWith(0);
+  });
+
+  it("excludes inputs under div role=contentinfo (footer landmark)", () => {
+    document.body.innerHTML = `
+      <div role="contentinfo">
+        <input type="email" placeholder="Subscribe email" />
+        <input type="text" placeholder="Full name" />
+      </div>
+    `;
+    const onChange = vi.fn();
+    startDetector(onChange);
+    vi.advanceTimersByTime(300);
+    expect(onChange).toHaveBeenCalledWith(0);
+  });
+
+  it("excludes inputs under div role=navigation", () => {
+    document.body.innerHTML = `
+      <div role="navigation">
+        <input type="email" placeholder="Email address" />
+        <input type="text" placeholder="Last name" />
+      </div>
+    `;
+    const onChange = vi.fn();
+    startDetector(onChange);
+    vi.advanceTimersByTime(300);
+    expect(onChange).toHaveBeenCalledWith(0);
+  });
+
+  it("does NOT trigger on a CMS page-editor with 'Title' + 'Description' (title alone is no longer a strong name signal)", () => {
+    document.body.innerHTML = `
+      <form>
+        <label>Title <input name="title" placeholder="Page title" /></label>
+        <label>Slug <input name="slug" /></label>
+        <label>Description <textarea></textarea></label>
+      </form>
+    `;
+    const onChange = vi.fn();
+    startDetector(onChange);
+    vi.advanceTimersByTime(300);
+    expect(onChange).toHaveBeenCalledWith(0);
+  });
+
+  it("counts <input type=date> + <input type=time> fields toward personalCount", () => {
+    document.body.innerHTML = `
+      <form>
+        <label>Date of birth <input type="date" name="dob" /></label>
+        <label>Preferred time <input type="time" name="t" /></label>
+        <label>Full name <input type="text" name="fn" /></label>
+      </form>
+    `;
+    const onChange = vi.fn();
+    startDetector(onChange);
+    vi.advanceTimersByTime(300);
+    expect(onChange).toHaveBeenCalledWith(3);
+  });
 });

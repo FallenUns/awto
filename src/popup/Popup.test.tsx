@@ -106,6 +106,7 @@ function mockFlow(overrides: { status: FlowStatus; state: Partial<FlowState> }) 
         fillRows: [],
         missingRows: [],
         skippedRows: [],
+        consentRows: [],
         filledCount: 0,
         failedFills: [],
         chunksCompleted: 0,
@@ -113,6 +114,7 @@ function mockFlow(overrides: { status: FlowStatus; state: Partial<FlowState> }) 
         ...overrides.state,
       } as FlowState,
       setMissingValue: vi.fn(),
+      setConsentChecked: vi.fn(),
       fill: vi.fn(),
       retry: vi.fn(),
       cancel: vi.fn(),
@@ -306,5 +308,26 @@ describe("Popup grouped sections", () => {
     const headers = document.querySelectorAll(".awto-section-header__label");
     const labels = Array.from(headers).map((h) => h.textContent);
     expect(labels).toEqual(["Will fill"]);
+  });
+
+  it("renders a Consent section and counts checked toggles in the Fill button", async () => {
+    mockFlow({
+      status: "ready",
+      state: {
+        loadingFields: [],
+        consentRows: [
+          { fieldId: 0, selector: "#promo", label: "Send me emails", consentType: "marketing", checked: true },
+          { fieldId: 1, selector: "#terms", label: "I agree to the Terms", consentType: "legal", checked: false },
+        ],
+      },
+    });
+    const { Popup: PopupDyn } = await import("./Popup");
+    const { render: renderDyn, screen: screenDyn } = await import("@testing-library/react");
+    renderDyn(<PopupDyn />);
+
+    const headers = document.querySelectorAll(".awto-section-header__label");
+    expect(Array.from(headers).map((h) => h.textContent)).toContain("Consent");
+    expect(document.querySelectorAll(".awto-consent-row")).toHaveLength(2);
+    expect(screenDyn.getByRole("button", { name: /fill 1 field/i })).toBeTruthy();
   });
 });

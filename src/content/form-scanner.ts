@@ -1,5 +1,7 @@
 import type { ScannedField } from "@/shared/messages";
+import type { ConsentLink } from "@/shared/consent";
 import { isAriaScanEnabled } from "./aria-settings";
+import { readComboboxValue } from "./combobox";
 
 const TEXT_LIKE_TYPES = new Set([
   "text",
@@ -23,6 +25,8 @@ const EXCLUDED_TYPES = new Set([
   "button",
   "image",
   "file",
+  "color",
+  "range",
 ]);
 
 type Fillable =
@@ -35,6 +39,8 @@ interface AriaQuery {
   type: string;
   collectOptions?: (el: HTMLElement) => string[];
   skipIfInside?: string;
+  requireOptions?: boolean;
+  isDropdown?: boolean;
 }
 
 function collectRoleOptions(el: HTMLElement, role: string): string[] {
@@ -48,6 +54,7 @@ const ARIA_QUERIES: AriaQuery[] = [
     selector: '[role="radiogroup"]',
     type: "radio",
     collectOptions: (el) => collectRoleOptions(el, "radio"),
+    requireOptions: true,
   },
   { selector: '[role="checkbox"]', type: "checkbox" },
   { selector: '[role="textbox"][contenteditable="true"]', type: "text" },
@@ -55,12 +62,21 @@ const ARIA_QUERIES: AriaQuery[] = [
     selector: '[role="combobox"]',
     type: "select",
     collectOptions: (el) => collectRoleOptions(el, "option"),
+    isDropdown: true,
   },
   {
     selector: '[role="listbox"]',
     type: "select",
     collectOptions: (el) => collectRoleOptions(el, "option"),
     skipIfInside: '[role="combobox"]',
+    isDropdown: true,
+  },
+  {
+    selector:
+      '[aria-haspopup="listbox"]:not([role="combobox"]):not([role="listbox"])',
+    type: "select",
+    collectOptions: (el) => collectRoleOptions(el, "option"),
+    isDropdown: true,
   },
 ];
 
@@ -128,6 +144,11 @@ export function scanFields(
       );
     }
 
+    if (type === "checkbox") {
+      const links = collectConsentLinks(el, ownerDoc);
+      if (links.length > 0) field.links = links;
+    }
+
     fields.push(field);
   }
 
@@ -144,26 +165,72 @@ export function scanFields(
         if (containsAny(el, nativeElements)) continue;
         if (isHidden(el)) continue;
         if (el.getAttribute("aria-disabled") === "true") continue;
+        if (el.getAttribute("aria-readonly") === "true") continue;
         if (q.skipIfInside && el.closest(q.skipIfInside)) continue;
+        if (q.isDropdown && isNonFillableDropdown(el)) continue;
 
         const options = q.collectOptions?.(el);
-        if (q.collectOptions && (!options || options.length === 0)) continue;
+        if (q.requireOptions && (!options || options.length === 0)) continue;
 
-        fields.push({
+        const ariaField: ScannedField = {
           id: nextId++,
           selector: buildAriaSelector(el, ownerDoc),
           label: extractAriaLabel(el, ownerDoc),
           placeholder: null,
           type: q.type,
           required: el.getAttribute("aria-required") === "true",
-          ...(options ? { options } : {}),
-        });
+          ...(options && options.length > 0 ? { options } : {}),
+        };
+
+        if (q.isDropdown) {
+          const { value, placeholder } = readComboboxValue(el);
+          if (value) ariaField.currentValue = value;
+          if (placeholder) ariaField.placeholder = placeholder;
+          if (!ariaField.label && placeholder) ariaField.label = placeholder;
+        }
+
+        if (q.type === "checkbox") {
+          const links = collectConsentLinks(el, ownerDoc);
+          if (links.length > 0) ariaField.links = links;
+        }
+
+        fields.push(ariaField);
         claimed.add(el);
       }
     }
   }
 
   return fields;
+}
+
+const SEARCH_RE = /\bsearch\b/i;
+
+function isNonFillableDropdown(el: HTMLElement): boolean {
+  const haspopup = el.getAttribute("aria-haspopup");
+  if (haspopup && haspopup !== "listbox" && haspopup !== "true") return true;
+
+  const doc = el.ownerDocument ?? document;
+  const controlsId =
+    el.getAttribute("aria-controls") ?? el.getAttribute("aria-owns");
+  if (controlsId) {
+    const target = doc.getElementById(controlsId);
+    if (target?.getAttribute("role") === "menu") return true;
+  }
+
+  const autocomplete = el.getAttribute("aria-autocomplete");
+  if (autocomplete === "list" || autocomplete === "both") {
+    const hint = `${el.getAttribute("aria-label") ?? ""} ${
+      el.getAttribute("placeholder") ?? ""
+    }`;
+    if (SEARCH_RE.test(hint)) return true;
+  }
+
+  // Phone dial-code pickers (e.g. "Country code Australia +61") are part of a phone
+  // widget, not a fillable value selector — a country name must never go into them.
+  const text = (el.textContent ?? "").replace(/\s+/g, " ").toLowerCase();
+  if (/\bcountry code\b|\bdial code\b/.test(text)) return true;
+
+  return false;
 }
 
 function isEligible(el: Fillable): boolean {
@@ -228,11 +295,26 @@ function isHidden(el: HTMLElement): boolean {
   let cur: HTMLElement | null = el;
   while (cur) {
     if (cur.getAttribute("aria-hidden") === "true") return true;
-    const style = cur.style;
-    if (style && (style.display === "none" || style.visibility === "hidden")) {
+    if (cur.hasAttribute("hidden")) return true;
+    const inlineStyle = cur.style;
+    if (
+      inlineStyle &&
+      (inlineStyle.display === "none" || inlineStyle.visibility === "hidden")
+    ) {
       return true;
     }
     cur = cur.parentElement;
+  }
+  const view = el.ownerDocument?.defaultView;
+  if (view && typeof view.getComputedStyle === "function") {
+    try {
+      const computed = view.getComputedStyle(el);
+      if (computed.display === "none" || computed.visibility === "hidden") {
+        return true;
+      }
+    } catch {
+      // getComputedStyle can throw on detached elements; treat as visible
+    }
   }
   return false;
 }
@@ -542,6 +624,36 @@ function matchesOne(doc: Document, selector: string): boolean {
   } catch {
     return false;
   }
+}
+
+function findLabelContainer(el: Element, doc: Document): Element | null {
+  const id = el.getAttribute("id");
+  if (id) {
+    const explicit = doc.querySelector(`label[for="${cssEscape(id)}"]`);
+    if (explicit) return explicit;
+  }
+  const wrapper = el.closest("label");
+  if (wrapper) return wrapper;
+  const labelledBy = el.getAttribute("aria-labelledby");
+  if (labelledBy) {
+    const first = labelledBy.split(/\s+/).filter(Boolean)[0];
+    if (first) {
+      const target = doc.getElementById(first);
+      if (target) return target;
+    }
+  }
+  return null;
+}
+
+function collectConsentLinks(el: Element, doc: Document): ConsentLink[] {
+  const container = findLabelContainer(el, doc);
+  if (!container) return [];
+  return Array.from(container.querySelectorAll("a[href]"))
+    .map((a) => ({
+      text: (a.textContent ?? "").replace(/\s+/g, " ").trim(),
+      href: a.getAttribute("href") ?? "",
+    }))
+    .filter((l) => l.text.length > 0);
 }
 
 function extractAriaLabel(el: HTMLElement, doc: Document): string {

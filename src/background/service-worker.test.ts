@@ -734,6 +734,85 @@ it("returns openPopupResult ok=false when chrome.action.openPopup rejects", asyn
   expect(reply).toEqual({ type: "openPopupResult", ok: false, error: "no active tab" });
 });
 
+describe("consent handling", () => {
+  const consentFields: ScannedField[] = [
+    { id: 0, selector: "#name", label: "First name", placeholder: null, type: "text", required: false, autocomplete: "given-name" },
+    { id: 1, selector: "#promo", label: "Send me emails with helpful tips", placeholder: null, type: "checkbox", required: false },
+    { id: 2, selector: "#terms", label: "I agree to the Terms of Service and Privacy Policy", placeholder: null, type: "checkbox", required: true },
+  ];
+
+  function portSpy(): { port: chrome.runtime.Port; posted: AwtoMessage[] } {
+    const posted: AwtoMessage[] = [];
+    const port = { postMessage: (m: AwtoMessage) => posted.push(m) } as unknown as chrome.runtime.Port;
+    return { port, posted };
+  }
+
+  it("posts mapFieldsConsent and excludes consent checkboxes from the LLM", async () => {
+    const { port, posted } = portSpy();
+    const callHybrid = vi.fn().mockResolvedValue({ response: { mappings: [] }, source: "local" });
+
+    await handleMessage(
+      { type: "mapFields", fields: consentFields, profile: { firstName: "Patrick", custom: {} } },
+      {
+        _loadLLMSettings: vi.fn().mockResolvedValue(defaultSettings),
+        _callHybrid: callHybrid,
+        _getMarketingConsent: vi.fn().mockResolvedValue("optIn"),
+        _port: port,
+      }
+    );
+
+    const consentMsg = posted.find((m) => m.type === "mapFieldsConsent");
+    expect(consentMsg).toBeDefined();
+    if (consentMsg?.type === "mapFieldsConsent") {
+      expect(consentMsg.consent.map((c) => c.fieldId)).toEqual([1, 2]);
+      expect(consentMsg.consent[0]).toMatchObject({ consentType: "marketing", proposedChecked: true });
+      expect(consentMsg.consent[1]).toMatchObject({ consentType: "legal", proposedChecked: false });
+    }
+    for (const call of callHybrid.mock.calls) {
+      const ids = (call[1] as ScannedField[]).map((f) => f.id);
+      expect(ids).not.toContain(1);
+      expect(ids).not.toContain(2);
+    }
+  });
+
+  it("backfills a skip for a non-consent field the LLM omits", async () => {
+    const callHybrid = vi.fn().mockResolvedValue({ response: { mappings: [] }, source: "local" });
+    const response = await handleMessage(
+      {
+        type: "mapFields",
+        fields: [{ id: 0, selector: "#mystery", label: "Mystery field", placeholder: null, type: "text", required: false }],
+        profile: { custom: {} },
+      },
+      { _loadLLMSettings: vi.fn().mockResolvedValue(defaultSettings), _callHybrid: callHybrid }
+    );
+    expect(response.type).toBe("mapFieldsComplete");
+    if (response.type === "mapFieldsComplete") {
+      expect(response.mappings).toEqual([
+        { fieldId: 0, actionType: "skip", profileKey: null, suggestedKey: null, promptText: null, reason: "No matching profile field", confidence: 1 },
+      ]);
+    }
+  });
+
+  it("posts fresh consent on a cache hit", async () => {
+    const { setCached, cacheKey, _clearCache } = await import("./result-cache");
+    _clearCache();
+    setCached(cacheKey(77, consentFields), { mappings: [], source: "cloud" });
+    const { port, posted } = portSpy();
+
+    const response = await handleMessage(
+      { type: "mapFields", fields: consentFields, profile: { custom: {} }, tabId: 77 },
+      { _getMarketingConsent: vi.fn().mockResolvedValue("optOut"), _port: port, _callHybrid: vi.fn() }
+    );
+
+    expect(response.type).toBe("mapFieldsResult");
+    const consentMsg = posted.find((m) => m.type === "mapFieldsConsent");
+    expect(consentMsg).toBeDefined();
+    if (consentMsg?.type === "mapFieldsConsent") {
+      expect(consentMsg.consent[0]).toMatchObject({ consentType: "marketing", proposedChecked: false });
+    }
+  });
+});
+
 describe("dedupeFillsByProfileKey", () => {
   const baseFill = (fieldId: number, profileKey: string) => ({
     fieldId,

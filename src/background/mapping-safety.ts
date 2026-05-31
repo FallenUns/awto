@@ -91,7 +91,7 @@ const INTENT_RULES: IntentRule[] = [
   { patterns: [/\bcompany\b/, /\bemployer\b/], allow: ["currentEmployer"] },
   { patterns: [/\bposition\b/, /\bjob\s*title\b/], allow: ["jobTitle"] },
   { patterns: [/\baddress\s*line\s*1\b/, /\bstreet\s*address\b/], allow: ["addressLine1"] },
-  { patterns: [/\baddress\s*line\s*2\b/, /\bapt\b/, /\bapartment\b/, /\bunit\b/, /\bsuite\b/], allow: ["addressLine2"] },
+  { patterns: [/\baddress\s*line\s*2\b/, /\bapt\b/, /\bapartment\b/, /\bunit\b/, /\bsuite\b/], allow: ["addressLine2", "unitNumber"] },
   { patterns: [/\bcity\b/, /\btown\b/, /\blocality\b/], allow: ["city", "suburb"] },
   { patterns: [/\bstate\b/, /\bprovince\b/, /\bregion\b/], allow: ["state"] },
   { patterns: [/\bcountry\b/], allow: ["country"] },
@@ -134,6 +134,21 @@ export function sanitizeMappings(
 function decide(field: ScannedField, profileKey: string): Decision {
   if (field.type === "password") {
     return { kind: "skip", reason: "Sensitive credential — fill manually" };
+  }
+
+  // A type="tel" input is the phone NUMBER box. International phone widgets often
+  // resolve its label to a sibling "Country code …" element, which would otherwise
+  // let a country value leak into the number. Decide purely by type here.
+  if (field.type === "tel") {
+    if (profileKey === "phone" || profileKey === "mobilePhone") {
+      if (/\bfax\b/.test(fieldSignal(field))) {
+        return { kind: "skip", reason: "Fax number not in profile" };
+      }
+      return { kind: "allow" };
+    }
+    if (profileKey === "country" || profileKey === "nationality") {
+      return { kind: "skip", reason: "Phone field — country value doesn't belong here" };
+    }
   }
 
   if (looksLikeThirdPartyQuestion(field) && REQUIRE_LABEL_MATCH[profileKey]) {

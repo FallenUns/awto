@@ -730,3 +730,176 @@ describe("ARIA respects disabled flag", () => {
     }
   });
 });
+
+describe("ARIA combobox without inline options (closed dropdown)", () => {
+  it("captures a role=combobox whose options are not yet rendered", () => {
+    document.body.innerHTML = `
+      <div class="air3-dropdown" id="country-dd">
+        <div role="combobox" aria-expanded="false" aria-controls="dropdown-menu"
+             aria-required="true" class="air3-dropdown-toggle">
+          <span class="air3-dropdown-toggle-label">Select a Country</span>
+        </div>
+      </div>
+      <div id="dropdown-menu"></div>
+    `;
+    const fields = scanFields();
+    expect(fields).toHaveLength(1);
+    expect(fields[0]).toMatchObject({ type: "select", required: true });
+  });
+
+  it("uses the placeholder text as the label when no other label exists", () => {
+    document.body.innerHTML = `
+      <div role="combobox" aria-controls="m">
+        <span class="air3-dropdown-toggle-label">Select a Country</span>
+      </div>
+      <div id="m"></div>
+    `;
+    const f = scanFields()[0];
+    expect(f?.label).toBe("Select a Country");
+    expect(f?.placeholder).toBe("Select a Country");
+    expect(f?.currentValue).toBeUndefined();
+  });
+
+  it("captures the current value of an already-selected combobox", () => {
+    document.body.innerHTML = `
+      <div role="combobox" aria-controls="m">
+        <span class="air3-dropdown-toggle-label">Australia</span>
+      </div>
+      <div id="m"></div>
+    `;
+    const f = scanFields()[0];
+    expect(f?.currentValue).toBe("Australia");
+  });
+});
+
+describe("custom dropdown exclusions", () => {
+  it("captures an aria-haspopup=listbox trigger that is not a combobox", () => {
+    document.body.innerHTML = `
+      <span id="lbl">Title</span>
+      <button aria-haspopup="listbox" aria-labelledby="lbl">Mr</button>
+    `;
+    const fields = scanFields();
+    expect(fields).toHaveLength(1);
+    expect(fields[0]).toMatchObject({ type: "select", label: "Title" });
+  });
+
+  it("excludes a command menu (aria-haspopup=menu)", () => {
+    document.body.innerHTML = `
+      <div role="combobox" aria-haspopup="menu" aria-controls="m">Actions</div>
+      <div id="m" role="menu"><div role="menuitem">Delete</div></div>
+    `;
+    expect(scanFields()).toEqual([]);
+  });
+
+  it("excludes a combobox whose popup is a role=menu", () => {
+    document.body.innerHTML = `
+      <div role="combobox" aria-controls="m">Sort</div>
+      <ul id="m" role="menu"><li role="menuitem">Newest</li></ul>
+    `;
+    expect(scanFields()).toEqual([]);
+  });
+
+  it("excludes a search combobox", () => {
+    document.body.innerHTML = `
+      <div role="combobox" aria-autocomplete="list" aria-label="Search products"></div>
+    `;
+    expect(scanFields()).toEqual([]);
+  });
+});
+
+describe("consent link capture", () => {
+  it("captures anchors inside a native checkbox label", () => {
+    document.body.innerHTML = `
+      <label>
+        <input type="checkbox" />
+        Yes, I agree to the
+        <a href="https://x.com/terms">Terms of Service</a> and
+        <a href="https://x.com/privacy">Privacy Policy</a>.
+      </label>
+    `;
+    const f = scanFields()[0];
+    expect(f?.type).toBe("checkbox");
+    expect(f?.links).toEqual([
+      { text: "Terms of Service", href: "https://x.com/terms" },
+      { text: "Privacy Policy", href: "https://x.com/privacy" },
+    ]);
+  });
+
+  it("omits links when the checkbox label has none", () => {
+    document.body.innerHTML = `<label><input type="checkbox" /> Remember me</label>`;
+    const f = scanFields()[0];
+    expect(f?.links).toBeUndefined();
+  });
+});
+
+describe("scanFields — excluded element types", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("excludes <input type=color>", () => {
+    document.body.innerHTML = `
+      <form>
+        <input id="email" type="email" />
+        <input id="c" type="color" />
+      </form>
+    `;
+    const fields = scanFields(document);
+    expect(fields.map((f) => f.type)).toEqual(["email"]);
+  });
+
+  it("excludes <input type=range>", () => {
+    document.body.innerHTML = `
+      <form>
+        <input id="email" type="email" />
+        <input id="r" type="range" min="0" max="100" />
+      </form>
+    `;
+    const fields = scanFields(document);
+    expect(fields.map((f) => f.type)).toEqual(["email"]);
+  });
+
+  it("skips ARIA widgets with aria-readonly=true", () => {
+    document.body.innerHTML = `
+      <div id="lbl">Comment</div>
+      <div role="textbox" contenteditable="true" aria-labelledby="lbl" aria-readonly="true">Read only</div>
+    `;
+    expect(scanFields(document)).toEqual([]);
+  });
+
+  it("skips inputs hidden via class-based display:none (computed style check)", () => {
+    document.body.innerHTML = `
+      <style>.hide{display:none}</style>
+      <form>
+        <input class="hide" id="hidden-fn" type="text" name="firstname" />
+        <input id="visible-email" type="email" name="email" />
+      </form>
+    `;
+    const fields = scanFields(document);
+    expect(fields.map((f) => f.selector)).toEqual(["#visible-email"]);
+  });
+});
+
+describe("phone dial-code combobox exclusion", () => {
+  it("excludes a phone country-code (dial) combobox", () => {
+    document.body.innerHTML = `
+      <div role="combobox" aria-controls="m">
+        <span class="air3-dropdown-toggle-label"><span class="sr-only">Country code Australia +61</span></span>
+      </div>
+      <div id="m"></div>
+    `;
+    expect(scanFields()).toEqual([]);
+  });
+
+  it("still captures a plain Country combobox", () => {
+    document.body.innerHTML = `
+      <span id="cl">Country</span>
+      <div role="combobox" aria-labelledby="cl">
+        <span class="air3-dropdown-toggle-label">Australia</span>
+      </div>
+    `;
+    const fields = scanFields();
+    expect(fields).toHaveLength(1);
+    expect(fields[0]).toMatchObject({ type: "select", label: "Country" });
+  });
+});

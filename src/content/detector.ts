@@ -12,7 +12,7 @@ const STRONG_CATEGORIES = new Set<Category>(["name", "address", "personal"]);
 const CATEGORY_KEYWORDS: Record<Category, string[]> = {
   name: [
     "first name", "last name", "given name", "family name", "surname",
-    "full name", "middle name", "preferred name", "nickname", "title",
+    "full name", "middle name", "preferred name", "nickname",
   ],
   contact: [
     "email", "e-mail", "phone", "telephone", "mobile", "cell phone", " tel ",
@@ -46,9 +46,17 @@ const SEARCH_KEYWORDS = [
 const COUNTED_TYPES = new Set([
   "text", "email", "tel", "number", "url", "textarea", "select",
   "radio", "checkbox",
+  "date", "month", "week", "time", "datetime-local",
 ]);
 
 const EXCLUDED_CONTAINER_TAGS = ["NAV", "HEADER", "FOOTER", "ASIDE"];
+
+const EXCLUDED_ARIA_ROLES = new Set([
+  "banner",
+  "contentinfo",
+  "complementary",
+  "navigation",
+]);
 
 function isCountedType(type: string): boolean {
   return COUNTED_TYPES.has(type.toLowerCase());
@@ -61,6 +69,8 @@ function isInExcludedContainer(selector: string): boolean {
     let cur: Element | null = el.parentElement;
     while (cur) {
       if (EXCLUDED_CONTAINER_TAGS.includes(cur.tagName)) return true;
+      const role = cur.getAttribute("role");
+      if (role && EXCLUDED_ARIA_ROLES.has(role)) return true;
       cur = cur.parentElement;
     }
     return false;

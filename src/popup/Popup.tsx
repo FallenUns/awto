@@ -4,6 +4,7 @@ import { Header } from "./Header";
 import { FieldRow } from "./FieldRow";
 import { ActionBar } from "./ActionBar";
 import { SectionHeader } from "./SectionHeader";
+import { ConsentRow } from "./ConsentRow";
 import { useAwtoFlow } from "./useAwtoFlow";
 import type { FillRow } from "./types";
 
@@ -27,7 +28,7 @@ export function formatFailureReason(reason: string): string {
 }
 
 export function Popup() {
-  const { state, status, setMissingValue, fill, retry, cancel, rescan } =
+  const { state, status, setMissingValue, setConsentChecked, fill, retry, cancel, rescan } =
     useAwtoFlow();
   const listRef = useRef<HTMLDivElement>(null);
   const [promoted, setPromoted] = useState<Set<number>>(new Set());
@@ -56,7 +57,8 @@ export function Popup() {
   const answeredMissing = state.missingRows.filter(
     (r) => r.userValue.trim() !== ""
   ).length;
-  const totalToFill = willFill.length + answeredMissing;
+  const checkedConsentCount = state.consentRows.filter((r) => r.checked).length;
+  const totalToFill = willFill.length + answeredMissing + checkedConsentCount;
   const missingCount = state.missingRows.length;
   const skipCount = state.skippedRows.length;
   const fillDisabled = totalToFill === 0;
@@ -66,8 +68,9 @@ export function Popup() {
     for (const r of state.fillRows) ids.add(r.fieldId);
     for (const r of state.missingRows) ids.add(r.fieldId);
     for (const r of state.skippedRows) ids.add(r.fieldId);
+    for (const r of state.consentRows) ids.add(r.fieldId);
     return ids;
-  }, [state.fillRows, state.missingRows, state.skippedRows]);
+  }, [state.fillRows, state.missingRows, state.skippedRows, state.consentRows]);
 
   const pendingFields = state.loadingFields.filter(
     (f) => !resolvedIds.has(f.id)
@@ -156,6 +159,27 @@ export function Popup() {
                     value={r.userValue}
                     promptText={r.promptText}
                     onChangeValue={(v) => setMissingValue(r.fieldId, v)}
+                  />
+                ))}
+              </>
+            )}
+
+            {state.consentRows.length > 0 && (
+              <>
+                <SectionHeader
+                  label="Consent"
+                  count={state.consentRows.length}
+                  tone="neutral"
+                />
+                {state.consentRows.map((r) => (
+                  <ConsentRow
+                    key={`consent-${r.fieldId}`}
+                    fieldId={r.fieldId}
+                    label={r.label}
+                    consentType={r.consentType}
+                    checked={r.checked}
+                    links={r.links}
+                    onToggle={(c) => setConsentChecked(r.fieldId, c)}
                   />
                 ))}
               </>

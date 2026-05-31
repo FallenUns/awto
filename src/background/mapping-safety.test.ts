@@ -362,3 +362,36 @@ describe("sanitizeMappings", () => {
     });
   });
 });
+
+describe("phone and apt mapping safety", () => {
+  const fill = (fieldId: number, profileKey: string): FieldMapping => ({
+    fieldId,
+    actionType: "fill",
+    profileKey,
+    suggestedKey: null,
+    promptText: null,
+    reason: null,
+    confidence: 0.95,
+  });
+
+  it("allows unitNumber into an Apt/Suite field", () => {
+    const out = sanitizeMappings([field(0, "Apt/Suite")], [fill(0, "unitNumber")]);
+    expect(out[0]).toMatchObject({ actionType: "fill", profileKey: "unitNumber" });
+  });
+
+  it("allows phone into a type=tel input despite a country-ish label", () => {
+    const out = sanitizeMappings(
+      [field(0, "Country code Australia +61", "tel")],
+      [fill(0, "phone")]
+    );
+    expect(out[0]).toMatchObject({ actionType: "fill", profileKey: "phone" });
+  });
+
+  it("blocks country from a type=tel input", () => {
+    const out = sanitizeMappings(
+      [field(0, "Country code Australia +61", "tel")],
+      [fill(0, "country")]
+    );
+    expect(out[0]?.actionType).toBe("skip");
+  });
+});

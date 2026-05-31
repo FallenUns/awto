@@ -1,6 +1,7 @@
 import type { AwtoMessage } from "@/shared/messages";
 import type { FieldMapping } from "@/shared/mapping";
-import { loadLLMSettings, type LLMSettings } from "@/shared/storage";
+import { loadLLMSettings, getMarketingConsent, type LLMSettings } from "@/shared/storage";
+import { buildConsentDecisions } from "./consent-classifier";
 import { callHybrid } from "./llm/hybrid";
 import { pingOllama, listOllamaModels } from "./llm/local";
 import { prefilter } from "./field-prefilter";
@@ -25,6 +26,7 @@ export interface HandleMessageDeps {
   signal?: AbortSignal;
   tabId?: number;
   _port?: chrome.runtime.Port | null;
+  _getMarketingConsent?: () => Promise<"optIn" | "optOut">;
 }
 
 function errorToMessage(err: unknown): string {
@@ -65,6 +67,17 @@ export async function handleMessage(
   switch (message.type) {
     case "mapFields": {
       const tabId = message.tabId ?? deps.tabId;
+      const getMktConsent = deps._getMarketingConsent ?? getMarketingConsent;
+
+      const marketingPref = await getMktConsent();
+      const { consent, consentIds } = buildConsentDecisions(
+        message.fields,
+        marketingPref
+      );
+      if (deps._port && consent.length > 0) {
+        deps._port.postMessage({ type: "mapFieldsConsent", consent });
+      }
+      const llmFields = message.fields.filter((f) => !consentIds.has(f.id));
 
       // Cache lookup (skipped when bypassCache=true)
       if (tabId !== undefined && !message.bypassCache) {
@@ -81,7 +94,7 @@ export async function handleMessage(
 
       // Rule layer (autocomplete-tagged fields resolved deterministically)
       const { ruleMappings: rawRuleMappings, remaining } = ruleMap(
-        message.fields,
+        llmFields,
         message.profile
       );
 
@@ -89,7 +102,7 @@ export async function handleMessage(
       // The rule layer's LABEL_RULES can match "last name" inside quiz/trivia
       // questions like "What was Luke Skywalker's original last name?" — the
       // sanitizer's quiz detector + REQUIRE_LABEL_MATCH guard catches those.
-      const ruleMappings = sanitizeMappings(message.fields, rawRuleMappings);
+      const ruleMappings = sanitizeMappings(llmFields, rawRuleMappings);
 
       // Existing prefilter on the remaining set (checkboxes/radios → skip)
       const { toLLM, skipped: preSkipped } = prefilter(remaining, message.profile);
@@ -147,10 +160,27 @@ export async function handleMessage(
         return { type: "mapFieldsError", error: errorMessage };
       }
 
+      const collected: FieldMapping[] = [
+        ...ruleMappings,
+        ...preSkipped,
+        ...llmMappings,
+      ];
+      const mappedIds = new Set(collected.map((m) => m.fieldId));
+      for (const f of llmFields) {
+        if (!mappedIds.has(f.id)) {
+          collected.push({
+            fieldId: f.id,
+            actionType: "skip",
+            profileKey: null,
+            suggestedKey: null,
+            promptText: null,
+            reason: "No matching profile field",
+            confidence: 1,
+          });
+        }
+      }
       const allMappings: FieldMapping[] = dedupeFillsByProfileKey(
-        [...ruleMappings, ...preSkipped, ...llmMappings].sort(
-          (a, b) => a.fieldId - b.fieldId
-        )
+        collected.sort((a, b) => a.fieldId - b.fieldId)
       );
 
       const source: "local" | "cloud" | "mixed" =

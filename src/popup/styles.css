@@ -585,3 +585,19 @@ button.awto-section-header:focus-visible {
     transform: none;
   }
 }
+
+/* ConsentRow */
+.awto-consent-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  min-height: 44px;
+}
+.awto-consent-row__text { display: flex; flex-direction: column; gap: 2px; }
+.awto-consent-row__label { font-size: 13px; color: var(--awto-fg, #f8fafc); }
+.awto-consent-row__required { color: #f59e0b; }
+.awto-consent-row__links { display: flex; flex-wrap: wrap; gap: 8px; }
+.awto-consent-row__link { font-size: 12px; color: #22c55e; text-decoration: underline; }
+.awto-consent-row__toggle { width: 36px; height: 22px; flex-shrink: 0; cursor: pointer; }
