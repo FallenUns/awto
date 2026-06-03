@@ -54,16 +54,39 @@ Awto uses a local Ollama instance by default for maximum privacy.
    ollama pull llama3.2
    ```
 
-3. Start Ollama (if not already running):
-   ```bash
-   ollama serve
-   ```
+3. Allow the extension to talk to Ollama.
 
-4. Verify it is running:
+   Ollama only answers requests from allow-listed origins. Chrome sends a
+   `chrome-extension://<id>` origin that Ollama rejects with **HTTP 403** by
+   default, so you must add it to `OLLAMA_ORIGINS` **before starting the server**:
+
+   - **CLI (`ollama serve`):**
+     ```bash
+     OLLAMA_ORIGINS="chrome-extension://*" ollama serve
+     ```
+   - **macOS desktop app:** set the variable for the login session, then restart
+     the app (Quit from the menu bar, reopen) so it inherits the value:
+     ```bash
+     launchctl setenv OLLAMA_ORIGINS "chrome-extension://*"
+     ```
+     `launchctl setenv` does **not** survive a reboot. To make it permanent, add
+     a LaunchAgent that runs the command at login (see
+     `~/Library/LaunchAgents`), or re-run it after each restart.
+
+   For a tighter allow-list, replace `chrome-extension://*` with your extension's
+   exact id (`chrome-extension://<id>`, copy it from `chrome://extensions`).
+
+4. Start Ollama. With the CLI, the command in step 3 already starts it. With the
+   macOS app, launch (or relaunch) it after setting the variable.
+
+5. Verify it is running and reachable from the extension origin:
    ```bash
    curl http://localhost:11434/api/version
+   curl -H "Origin: chrome-extension://test" http://localhost:11434/api/version
    ```
-   You should see a JSON response with the version number.
+   The first returns the version JSON. The second must **also** return `200`
+   (not `403`) — that confirms `OLLAMA_ORIGINS` is set correctly. A plain `curl`
+   sends no `Origin` header, so it can succeed even when the extension is blocked.
 
 ## (Optional) Cloud fallback
 

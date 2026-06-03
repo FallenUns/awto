@@ -3,6 +3,16 @@ import type { Profile } from "@/shared/profile";
 import type { ScannedField } from "@/shared/messages";
 import { SYSTEM_PROMPT, buildUserPrompt, getOutputJsonSchema } from "./prompt";
 
+// Ollama answers only allow-listed origins. Chrome attaches a
+// "chrome-extension://<id>" Origin that is rejected with 403 unless the user
+// adds it to OLLAMA_ORIGINS, so a raw "HTTP 403" is surfaced as actionable help.
+export const OLLAMA_ORIGINS_HELP =
+  'Ollama refused the request (HTTP 403). Ollama only serves allow-listed origins, ' +
+  'and Chrome sends a "chrome-extension://…" origin that is blocked by default. ' +
+  'Add it to OLLAMA_ORIGINS and restart Ollama. macOS app: run ' +
+  'launchctl setenv OLLAMA_ORIGINS "chrome-extension://*" then relaunch Ollama. ' +
+  'CLI: OLLAMA_ORIGINS="chrome-extension://*" ollama serve';
+
 export class LocalLLMError extends Error {
   override readonly name = "LocalLLMError";
   override readonly cause?: unknown;
@@ -77,6 +87,9 @@ export async function callLocal(
   }
 
   if (!res.ok) {
+    if (res.status === 403) {
+      throw new LocalLLMError(OLLAMA_ORIGINS_HELP);
+    }
     let detail = "";
     try {
       detail = await res.text();

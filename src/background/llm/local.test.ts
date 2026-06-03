@@ -162,6 +162,15 @@ describe("callLocal", () => {
     );
   });
 
+  it("explains the OLLAMA_ORIGINS fix on a 403 response", async () => {
+    (fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockFetchResponse({ ok: false, status: 403 })
+    );
+    await expect(callLocal(profile, fields, opts)).rejects.toThrow(
+      /OLLAMA_ORIGINS.*chrome-extension/s
+    );
+  });
+
   it("throws LocalLLMError when message.content is missing", async () => {
     (fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
       mockFetchResponse({
