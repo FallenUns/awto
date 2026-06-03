@@ -64,17 +64,27 @@ Awto uses a local Ollama instance by default for maximum privacy.
      ```bash
      OLLAMA_ORIGINS="chrome-extension://*" ollama serve
      ```
-   - **macOS desktop app:** set the variable for the login session, then restart
-     the app (Quit from the menu bar, reopen) so it inherits the value:
+   - **macOS desktop app (recommended — automated):** run the bundled installer
+     once. It installs a LaunchAgent that sets `OLLAMA_ORIGINS` at every login
+     (so it survives reboots) and applies it to the current session immediately:
+     ```bash
+     ./scripts/install-ollama-origins-agent.sh
+     ```
+     Then restart Ollama once (quit the menu-bar app and reopen) so the running
+     server inherits the value. To remove it later:
+     ```bash
+     ./scripts/install-ollama-origins-agent.sh --uninstall
+     ```
+   - **macOS desktop app (manual, one-off):** set it for the current login
+     session only — this does **not** survive a reboot:
      ```bash
      launchctl setenv OLLAMA_ORIGINS "chrome-extension://*"
      ```
-     `launchctl setenv` does **not** survive a reboot. To make it permanent, add
-     a LaunchAgent that runs the command at login (see
-     `~/Library/LaunchAgents`), or re-run it after each restart.
 
    For a tighter allow-list, replace `chrome-extension://*` with your extension's
-   exact id (`chrome-extension://<id>`, copy it from `chrome://extensions`).
+   exact id (`chrome-extension://<id>`, copy it from `chrome://extensions`). The
+   installer accepts it as an argument:
+   `./scripts/install-ollama-origins-agent.sh "chrome-extension://<id>"`.
 
 4. Start Ollama. With the CLI, the command in step 3 already starts it. With the
    macOS app, launch (or relaunch) it after setting the variable.
