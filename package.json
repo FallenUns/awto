@@ -4,6 +4,7 @@
   "description": "Smart personal-detail autofill Chrome extension",
   "type": "module",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

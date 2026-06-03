@@ -18,7 +18,7 @@ v0.1.0, alpha. Not yet on the Chrome Web Store.
 
 1. Clone the repository:
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/FallenUns/awto.git
    cd awto
    ```
 
@@ -127,4 +127,4 @@ Awto is designed to protect your data:
 
 ## License
 
-MIT
+Released under the [MIT License](LICENSE). Copyright (c) 2026 Patrick Adrianus.
