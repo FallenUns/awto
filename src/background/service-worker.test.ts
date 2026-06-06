@@ -119,6 +119,77 @@ describe("handleMessage", () => {
     expect(callHybrid.mock.calls[0]?.[1]).toEqual([taggedFields[1]]);
   });
 
+  it("maps IAG-style preferred first name and single address line from saved settings", async () => {
+    const loadLLMSettings = vi.fn().mockResolvedValue(defaultSettings);
+    const callHybrid = vi.fn();
+    const iagFields: ScannedField[] = [
+      {
+        id: 0,
+        selector: "#preferredName",
+        label: "Legal First Name",
+        placeholder: null,
+        type: "text",
+        required: true,
+        autocomplete: "off",
+      },
+      {
+        id: 1,
+        selector: "#firstName",
+        label: "Preferred First Name",
+        placeholder: null,
+        type: "text",
+        required: true,
+        autocomplete: "given-name",
+      },
+      {
+        id: 2,
+        selector: "#address",
+        label: "Address Line 1",
+        placeholder: null,
+        type: "text",
+        required: true,
+        autocomplete: "street-address",
+      },
+    ];
+    const savedProfile: Profile = {
+      firstName: "Patrick",
+      preferredName: "Pat",
+      unitNumber: "206",
+      addressLine1: "327 La Trobe St",
+      custom: {},
+    };
+
+    const response = await handleMessage(
+      { type: "mapFields", fields: iagFields, profile: savedProfile },
+      { _loadLLMSettings: loadLLMSettings, _callHybrid: callHybrid }
+    );
+
+    expect(response.type).toBe("mapFieldsComplete");
+    expect(callHybrid).not.toHaveBeenCalled();
+    expect(loadLLMSettings).not.toHaveBeenCalled();
+    if (response.type === "mapFieldsComplete") {
+      expect(response.mappings).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            fieldId: 0,
+            actionType: "fill",
+            profileKey: "firstName",
+          }),
+          expect.objectContaining({
+            fieldId: 1,
+            actionType: "fill",
+            profileKey: "preferredName",
+          }),
+          expect.objectContaining({
+            fieldId: 2,
+            actionType: "fill",
+            profileKey: "addressLine1WithUnit",
+          }),
+        ])
+      );
+    }
+  });
+
   it("sanitizes rule-mapper fills against trivia questions — Star Wars quiz regression", async () => {
     const loadLLMSettings = vi.fn().mockResolvedValue(defaultSettings);
     const callHybrid = vi.fn().mockResolvedValue({

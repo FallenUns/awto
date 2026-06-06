@@ -61,10 +61,17 @@ const LABEL_RULES: LabelRule[] = [
   { key: "dateOfBirthDay", patterns: [/^day$/] },
   { key: "dateOfBirthYear", patterns: [/^year$/] },
   { key: "title", patterns: [/\b(title|honou?rific|salutation)\b/] },
+  {
+    key: "preferredName",
+    patterns: [
+      /\bpreferred\s+(first|given)\s*name\b/,
+      /\bpreferred\s*name\b/,
+      /\bnickname\b/,
+    ],
+  },
   { key: "firstName", patterns: [/\b(first|given|forename)\s*name\b/, /\bgiven\b/] },
   { key: "middleName", patterns: [/\b(middle|additional)\s*name\b/] },
   { key: "lastName", patterns: [/\b(last|family|sur)\s*name\b/, /\bsurname\b/] },
-  { key: "preferredName", patterns: [/\bpreferred\s*name\b/, /\bnickname\b/] },
   { key: "fullName", patterns: [/\b(full|your|customer|applicant|contact)\s*name\b/, /^name$/] },
   { key: "pronouns", patterns: [/\bpronouns?\b/] },
   { key: "gender", patterns: [/\bgender\b/, /\bsex\b/] },
