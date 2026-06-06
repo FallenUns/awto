@@ -589,14 +589,26 @@ button.awto-section-header:focus-visible {
 /* ConsentRow */
 .awto-consent-row {
   display: flex;
+  flex-shrink: 0;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   padding: 10px 16px;
   min-height: 44px;
 }
-.awto-consent-row__text { display: flex; flex-direction: column; gap: 2px; }
-.awto-consent-row__label { font-size: 13px; color: var(--awto-fg, #f8fafc); }
+.awto-consent-row__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.awto-consent-row__label {
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--awto-fg, #f8fafc);
+  overflow-wrap: break-word;
+}
 .awto-consent-row__required { color: #f59e0b; }
 .awto-consent-row__links { display: flex; flex-wrap: wrap; gap: 8px; }
 .awto-consent-row__link { font-size: 12px; color: #22c55e; text-decoration: underline; }

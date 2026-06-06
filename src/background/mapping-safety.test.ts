@@ -207,6 +207,13 @@ describe("sanitizeMappings", () => {
       expect(sanitizeMappings([field(0, "Name:")], [m])).toEqual([m]);
     });
 
+    it("allows preferredName on a Preferred First Name field", () => {
+      const m = fill(0, "preferredName");
+      expect(sanitizeMappings([field(0, "Preferred First Name")], [m])).toEqual([
+        m,
+      ]);
+    });
+
     it("allows fullName on a label 'Name' with no qualifier", () => {
       const m = fill(0, "fullName");
       expect(sanitizeMappings([field(0, "Name")], [m])).toEqual([m]);
@@ -377,6 +384,18 @@ describe("phone and apt mapping safety", () => {
   it("allows unitNumber into an Apt/Suite field", () => {
     const out = sanitizeMappings([field(0, "Apt/Suite")], [fill(0, "unitNumber")]);
     expect(out[0]).toMatchObject({ actionType: "fill", profileKey: "unitNumber" });
+  });
+
+  it("allows composed addressLine1WithUnit into a single Address Line 1 field", () => {
+    const out = sanitizeMappings(
+      [field(0, "Address Line 1")],
+      [fill(0, "addressLine1WithUnit")]
+    );
+
+    expect(out[0]).toMatchObject({
+      actionType: "fill",
+      profileKey: "addressLine1WithUnit",
+    });
   });
 
   it("allows phone into a type=tel input despite a country-ish label", () => {

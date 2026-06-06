@@ -75,6 +75,14 @@ const INTENT_RULES: IntentRule[] = [
     suggestedKey: "comments",
   },
   { patterns: [/\btitle\b/, /\bhonou?rific\b/, /\bsalutation\b/], allow: ["title"] },
+  {
+    patterns: [
+      /\bpreferred\s+(first|given)\s*name\b/,
+      /\bpreferred\s*name\b/,
+      /\bnickname\b/,
+    ],
+    allow: ["preferredName"],
+  },
   { patterns: [/\bfirst\s*name\b/, /\bgiven\s*name\b/, /\bforename\b/], allow: ["firstName"] },
   { patterns: [/\bmiddle\s*name\b/], allow: ["middleName"] },
   { patterns: [/\blast\s*name\b/, /\bfamily\s*name\b/, /\bsurname\b/], allow: ["lastName"] },
@@ -90,7 +98,7 @@ const INTENT_RULES: IntentRule[] = [
   { patterns: [/^\s*name\s*[:*]?\s*$/i, /^\s*name\s*\*?\s*$/i], allow: ["fullName", "firstName", "lastName"] },
   { patterns: [/\bcompany\b/, /\bemployer\b/], allow: ["currentEmployer"] },
   { patterns: [/\bposition\b/, /\bjob\s*title\b/], allow: ["jobTitle"] },
-  { patterns: [/\baddress\s*line\s*1\b/, /\bstreet\s*address\b/], allow: ["addressLine1"] },
+  { patterns: [/\baddress\s*line\s*1\b/, /\bstreet\s*address\b/], allow: ["addressLine1", "addressLine1WithUnit"] },
   { patterns: [/\baddress\s*line\s*2\b/, /\bapt\b/, /\bapartment\b/, /\bunit\b/, /\bsuite\b/], allow: ["addressLine2", "unitNumber"] },
   { patterns: [/\bcity\b/, /\btown\b/, /\blocality\b/], allow: ["city", "suburb"] },
   { patterns: [/\bstate\b/, /\bprovince\b/, /\bregion\b/], allow: ["state"] },

@@ -196,6 +196,26 @@ describe("ruleMap", () => {
     });
   });
 
+  it("maps legal first name and preferred first name to distinct profile keys", () => {
+    const { ruleMappings, remaining } = ruleMap(
+      [
+        labelledField(0, "Legal First Name"),
+        labelledField(1, "Preferred First Name"),
+      ],
+      {
+        firstName: "Patrick",
+        preferredName: "Pat",
+        custom: {},
+      }
+    );
+
+    expect(remaining).toEqual([]);
+    expect(ruleMappings.map((m) => m.profileKey)).toEqual([
+      "firstName",
+      "preferredName",
+    ]);
+  });
+
   it("uses plain addressLine1 when the form has a separate address line 2", () => {
     const { ruleMappings } = ruleMap(
       [
