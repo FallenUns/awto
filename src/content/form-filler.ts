@@ -1,4 +1,5 @@
 import type { FillValue } from "@/shared/messages";
+import { extractDateFormatHint, formatIsoDateForField } from "@/shared/date-format";
 import { readComboboxValue } from "./combobox";
 
 export interface FillResult {
@@ -13,7 +14,7 @@ export async function fillFields(
   let filled = 0;
   const failed: Array<{ selector: string; reason: string }> = [];
 
-  for (const { selector, value, profileKey } of values) {
+  for (const { selector, value, profileKey, label } of values) {
     const el = root.querySelector(selector);
     if (!el) {
       failed.push({ selector, reason: "selector not found" });
@@ -125,7 +126,8 @@ export async function fillFields(
       el instanceof HTMLInputElement ||
       el instanceof HTMLTextAreaElement
     ) {
-      setNativeValue(el, value);
+      const formattedValue = formatValueForElement(el, value, label);
+      setNativeValue(el, formattedValue);
       el.dispatchEvent(new Event("input", { bubbles: true }));
       el.dispatchEvent(new Event("change", { bubbles: true }));
       filled++;
@@ -136,6 +138,45 @@ export async function fillFields(
   }
 
   return { filled, failed };
+}
+
+function formatValueForElement(
+  el: HTMLInputElement | HTMLTextAreaElement,
+  value: string,
+  label: string | undefined
+): string {
+  return formatIsoDateForField(value, {
+    type: el instanceof HTMLInputElement ? el.type : "textarea",
+    label,
+    placeholder: el.getAttribute("placeholder"),
+    formatHint: liveDateFormatHint(el),
+  });
+}
+
+function liveDateFormatHint(el: HTMLElement): string | null {
+  const placeholder = el.getAttribute("placeholder");
+  const placeholderHint = extractDateFormatHint(placeholder);
+  if (placeholderHint) return placeholderHint;
+
+  const describedBy = el.getAttribute("aria-describedby");
+  if (describedBy) {
+    for (const id of describedBy.split(/\s+/).filter(Boolean)) {
+      const text = el.ownerDocument.getElementById(id)?.textContent;
+      const hint = extractDateFormatHint(text);
+      if (hint) return hint;
+    }
+  }
+
+  let next = el.nextElementSibling;
+  for (let i = 0; next && i < 3; i++) {
+    if (!isFillableElement(next)) {
+      const hint = extractDateFormatHint(directText(next) || next.textContent);
+      if (hint) return hint;
+    }
+    next = next.nextElementSibling;
+  }
+
+  return null;
 }
 
 export async function fillAriaWidget(

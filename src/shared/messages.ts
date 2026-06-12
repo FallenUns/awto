@@ -12,6 +12,7 @@ export interface ScannedField {
   options?: string[];
   autocomplete?: string;
   currentValue?: string;
+  formatHint?: string;
   links?: ConsentLink[];
 }
 

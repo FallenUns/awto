@@ -43,6 +43,35 @@ describe("fillFields", () => {
     expect(result.failed).toEqual([]);
   });
 
+  it("formats ISO date values to the text input's displayed date format", async () => {
+    setBody(`
+      <form>
+        <label for="dob">What's your date of birth?</label>
+        <input id="dob" type="text" />
+        <div>DD/MM/YYYY</div>
+      </form>
+    `);
+
+    const input = document.querySelector("#dob") as HTMLInputElement;
+    const events: string[] = [];
+    input.addEventListener("input", () => events.push("input"));
+    input.addEventListener("change", () => events.push("change"));
+
+    const result = await fillFields(document, [
+      {
+        selector: "#dob",
+        value: "2004-06-23",
+        label: "What's your date of birth?",
+        profileKey: "dateOfBirth",
+      },
+    ]);
+
+    expect(input.value).toBe("23/06/2004");
+    expect(events).toEqual(["input", "change"]);
+    expect(result.filled).toBe(1);
+    expect(result.failed).toEqual([]);
+  });
+
   it("fills an email input and dispatches input + change", async () => {
     setBody(`<input id="email" type="email" />`);
     const input = document.querySelector("#email") as HTMLInputElement;

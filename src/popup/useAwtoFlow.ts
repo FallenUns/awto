@@ -12,6 +12,7 @@ import {
   setProfileValue,
   type Profile,
 } from "@/shared/profile";
+import { formatIsoDateForField } from "@/shared/date-format";
 import { loadProfile, saveProfile, setMarketingConsent } from "@/shared/storage";
 import type {
   ConsentRow,
@@ -92,7 +93,15 @@ function buildRows(
     const field = fieldsById.get(mapping.fieldId);
     if (!field) continue;
     if (isFillMapping(mapping)) {
-      const value = getProfileValue(profile, mapping.profileKey) ?? "";
+      const value = formatIsoDateForField(
+        getProfileValue(profile, mapping.profileKey) ?? "",
+        {
+          type: field.type,
+          label: field.label,
+          placeholder: field.placeholder,
+          formatHint: field.formatHint,
+        }
+      );
       fillRows.push({
         fieldId: mapping.fieldId,
         selector: field.selector,

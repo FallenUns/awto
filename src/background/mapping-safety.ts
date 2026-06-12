@@ -102,6 +102,16 @@ const INTENT_RULES: IntentRule[] = [
   { patterns: [/\baddress\s*line\s*2\b/, /\bapt\b/, /\bapartment\b/, /\bunit\b/, /\bsuite\b/], allow: ["addressLine2", "unitNumber"] },
   { patterns: [/\bcity\b/, /\btown\b/, /\blocality\b/], allow: ["city", "suburb"] },
   { patterns: [/\bstate\b/, /\bprovince\b/, /\bregion\b/], allow: ["state"] },
+  {
+    patterns: [
+      /\bcountry\b.*\b(driver'?s?\s*)?licen[cs]e\b/,
+      /\b(driver'?s?\s*)?licen[cs]e\b.*\b(country|issued|issue|issuing)\b/,
+      /\bcountry\b.*\bpermit\b/,
+      /\bpermit\b.*\b(country|issued|issue|issuing)\b/,
+    ],
+    allow: ["driverLicenseCountry", "driverLicenceCountry"],
+    suggestedKey: "driverLicenseCountry",
+  },
   { patterns: [/\bcountry\b/], allow: ["country"] },
   { patterns: [/\bzip\b/, /\bpost\s*code\b/, /\bpostcode\b/, /\bpostal\s*code\b/], allow: ["postcode"] },
   { patterns: [/\bcell\s*phone\b/, /\bmobile\b/, /\bcell\b/], allow: ["mobilePhone", "phone"] },
@@ -230,9 +240,19 @@ function suggestedKey(field: ScannedField): string {
 }
 
 function promptText(field: ScannedField, fallbackKey?: string): string {
+  const visible = normalizeSpaces(field.label || field.placeholder || "");
+  if (visible && looksLikePromptQuestion(visible)) {
+    return phrasePrompt(visible, fallbackKey ?? suggestedKey(field));
+  }
   const label = humanLabel(field);
   if (label !== "answer for this field") return `What's your ${label}?`;
   return `What's your ${fallbackKey ?? "answer for this field"}?`;
+}
+
+function looksLikePromptQuestion(text: string): boolean {
+  return /^(what|where|when|why|how|who|which|to\s+what|is|are|do|does|did|can|could|should|would|will|tell|describe)\b/i.test(
+    text
+  );
 }
 
 function makeSkip(fieldId: number, reason: string): FieldMapping {

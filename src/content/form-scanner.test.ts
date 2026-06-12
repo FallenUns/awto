@@ -112,6 +112,23 @@ describe("scanFields", () => {
     expect(fields[0]?.placeholder).toBe("Email");
   });
 
+  it("captures a nearby date format hint", () => {
+    setBody(`
+      <form>
+        <label for="dob">What's your date of birth?</label>
+        <input id="dob" name="dob" type="text" />
+        <div class="hint">DD/MM/YYYY</div>
+      </form>
+    `);
+
+    const fields = scanFields(document);
+
+    expect(fields[0]).toMatchObject({
+      label: "What's your date of birth?",
+      formatHint: "DD/MM/YYYY",
+    });
+  });
+
   it("extracts labels from the preceding table cell in the same row", () => {
     setBody(`
       <form>

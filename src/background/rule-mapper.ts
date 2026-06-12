@@ -87,6 +87,15 @@ const LABEL_RULES: LabelRule[] = [
   { key: "city", patterns: [/\bcity\b/, /\btown\b/, /\blocality\b/] },
   { key: "state", patterns: [/\bstate\b/, /\bprovince\b/, /\bregion\b/] },
   { key: "postcode", patterns: [/\bpost\s*code\b/, /\bpostcode\b/, /\bzip(\s*code)?\b/, /\bpostal\s*code\b/] },
+  {
+    key: ["driverLicenseCountry", "driverLicenceCountry"],
+    patterns: [
+      /\bcountry\b.*\b(driver'?s?\s*)?licen[cs]e\b/,
+      /\b(driver'?s?\s*)?licen[cs]e\b.*\b(country|issued|issue|issuing)\b/,
+      /\bcountry\b.*\bpermit\b/,
+      /\bpermit\b.*\b(country|issued|issue|issuing)\b/,
+    ],
+  },
   { key: "country", patterns: [/\bcountry\b/] },
   { key: "currentEmployer", patterns: [/\bcurrent\s*employer\b/, /\bemployer\b/, /\bcompany\b/] },
   { key: "jobTitle", patterns: [/\bjob\s*title\b/, /\bposition\s*title\b/, /\bposition\b/] },

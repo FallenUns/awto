@@ -1,5 +1,6 @@
 import type { ScannedField } from "@/shared/messages";
 import type { ConsentLink } from "@/shared/consent";
+import { extractDateFormatHint } from "@/shared/date-format";
 import { isAriaScanEnabled } from "./aria-settings";
 import { readComboboxValue } from "./combobox";
 
@@ -138,6 +139,9 @@ export function scanFields(
       ...(autocomplete ? { autocomplete } : {}),
     };
 
+    const formatHint = extractDateFormatHintForElement(el, ownerDoc, field);
+    if (formatHint) field.formatHint = formatHint;
+
     if (el instanceof HTMLSelectElement) {
       field.options = Array.from(el.options).map((o) =>
         (o.textContent ?? "").trim()
@@ -188,6 +192,9 @@ export function scanFields(
           if (placeholder) ariaField.placeholder = placeholder;
           if (!ariaField.label && placeholder) ariaField.label = placeholder;
         }
+
+        const formatHint = extractDateFormatHintForElement(el, ownerDoc, ariaField);
+        if (formatHint) ariaField.formatHint = formatHint;
 
         if (q.type === "checkbox") {
           const links = collectConsentLinks(el, ownerDoc);
@@ -445,6 +452,36 @@ function extractLabel(el: Fillable, doc: Document): string {
   const sibling = nearestPrecedingText(el);
   if (sibling) return sibling;
   return "";
+}
+
+function extractDateFormatHintForElement(
+  el: HTMLElement,
+  doc: Document,
+  field: Pick<ScannedField, "label" | "placeholder">
+): string | null {
+  const inline =
+    extractDateFormatHint(field.placeholder) ?? extractDateFormatHint(field.label);
+  if (inline) return inline;
+
+  const describedBy = el.getAttribute("aria-describedby");
+  if (describedBy) {
+    for (const id of describedBy.split(/\s+/).filter(Boolean)) {
+      const text = doc.getElementById(id)?.textContent;
+      const hint = extractDateFormatHint(text);
+      if (hint) return hint;
+    }
+  }
+
+  let next = el.nextElementSibling;
+  for (let i = 0; next && i < 3; i++) {
+    if (!isFillableElement(next)) {
+      const hint = extractDateFormatHint(directText(next) || next.textContent);
+      if (hint) return hint;
+    }
+    next = next.nextElementSibling;
+  }
+
+  return null;
 }
 
 function nearestExplicitLabel(el: HTMLElement, doc: Document): HTMLLabelElement | null {

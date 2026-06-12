@@ -368,6 +368,21 @@ describe("sanitizeMappings", () => {
       suggestedKey: "webSite",
     });
   });
+
+  it("does not allow address country on a driver licence issuing-country field", () => {
+    const sanitized = sanitizeMappings(
+      [field(0, "Which country was your licence issued?", "select")],
+      [fill(0, "country")]
+    );
+
+    expect(sanitized[0]).toMatchObject({
+      fieldId: 0,
+      actionType: "missing",
+      profileKey: null,
+      suggestedKey: "driverLicenseCountry",
+      promptText: "Which country was your licence issued?",
+    });
+  });
 });
 
 describe("phone and apt mapping safety", () => {

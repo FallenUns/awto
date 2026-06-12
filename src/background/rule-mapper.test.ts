@@ -147,6 +147,47 @@ describe("ruleMap", () => {
     ]);
   });
 
+  it("asks for driver licence country instead of using address country", () => {
+    const { ruleMappings, remaining } = ruleMap(
+      [
+        labelledField(0, "Which country was your licence issued?", "select", [
+          "Please select",
+          "Australia",
+          "Indonesia",
+        ]),
+      ],
+      { country: "Australia", custom: {} }
+    );
+
+    expect(remaining).toEqual([]);
+    expect(ruleMappings[0]).toMatchObject({
+      fieldId: 0,
+      actionType: "missing",
+      profileKey: null,
+      suggestedKey: "driverLicenseCountry",
+    });
+  });
+
+  it("fills driver licence country when it has been remembered", () => {
+    const { ruleMappings, remaining } = ruleMap(
+      [
+        labelledField(0, "Which country was your licence issued?", "select", [
+          "Please select",
+          "Australia",
+          "Indonesia",
+        ]),
+      ],
+      { country: "Australia", custom: { driverLicenseCountry: "Indonesia" } }
+    );
+
+    expect(remaining).toEqual([]);
+    expect(ruleMappings[0]).toMatchObject({
+      fieldId: 0,
+      actionType: "fill",
+      profileKey: "driverLicenseCountry",
+    });
+  });
+
   it("does not confuse city with address line 2", () => {
     const richProfile: Profile = {
       addressLine2: "Address Line 2 Test",
