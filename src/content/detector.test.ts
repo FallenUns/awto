@@ -124,6 +124,22 @@ describe("startDetector", () => {
     expect(onChange).toHaveBeenCalledWith(0);
   });
 
+  it("ignores a product-listing page whose option labels merely contain words like 'storage'", () => {
+    document.body.innerHTML = `
+      <main>
+        <input type="search" name="q" aria-label="Search for products" />
+        <label><input type="radio" name="variant-a" value="1" /> Option: FRIHETEN, Corner sofa-bed with storage, Skiftebo dark grey</label>
+        <label><input type="radio" name="variant-a" value="2" /> Option: FRIHETEN, Corner sofa-bed with storage, Bomstad black</label>
+        <label><input type="radio" name="variant-b" value="1" /> Option: VIMLE, 2-seat sofa-bed with storage, Gunnared beige</label>
+        <label><input type="checkbox" name="cmp1" /> Compare — Corner sofa-bed with storage</label>
+      </main>
+    `;
+    const onChange = vi.fn();
+    startDetector(onChange);
+    vi.advanceTimersByTime(300);
+    expect(onChange).toHaveBeenCalledWith(0);
+  });
+
   it("ignores a page with only an email subscribe field", () => {
     document.body.innerHTML = `
       <form>
