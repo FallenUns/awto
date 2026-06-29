@@ -6,6 +6,7 @@ import {
 } from "./prompt";
 import type { Profile } from "@/shared/profile";
 import type { ScannedField } from "@/shared/messages";
+import type { PromptPageContext } from "@/shared/page-context";
 
 describe("SYSTEM_PROMPT", () => {
   it("is non-empty", () => {
@@ -334,5 +335,25 @@ describe("phone vs country-code rule", () => {
     const p = SYSTEM_PROMPT.toLowerCase();
     expect(p).toContain('type="tel"');
     expect(p).toContain("never put a country");
+  });
+});
+
+describe("buildUserPrompt pageContext hint", () => {
+  const profile: Profile = { custom: {} };
+  const fields: ScannedField[] = [
+    { id: 0, selector: "#e", label: "Email", placeholder: null, type: "email", required: true },
+  ];
+
+  it("renders a context line naming the URL and form kind", () => {
+    const ctx: PromptPageContext = { url: "acme.com/signin", title: "Sign in — Acme", formKind: "auth" };
+    const out = buildUserPrompt(profile, fields, undefined, ctx);
+    expect(out).toContain("Page context");
+    expect(out).toContain("acme.com/signin");
+    expect(out).toContain("login"); // auth → login hint
+  });
+
+  it("omits the context line when pageContext is undefined", () => {
+    const out = buildUserPrompt(profile, fields, undefined, undefined);
+    expect(out).not.toContain("Page context");
   });
 });

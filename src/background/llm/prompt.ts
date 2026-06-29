@@ -2,6 +2,22 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 import { LLMResponseSchema } from "@/shared/mapping";
 import { profileKeys, getProfileValue, type Profile } from "@/shared/profile";
 import type { ScannedField } from "@/shared/messages";
+import type { PromptPageContext, FormKind } from "@/shared/page-context";
+
+const FORM_KIND_HINT: Record<FormKind, string> = {
+  auth: "This is a login form — fill only the user's email/identity fields; never a password.",
+  register: "This is a signup form — expect name, email, phone, maybe date of birth.",
+  application: "This is a job/HR application — expect name, contact details, address, and work-history fields.",
+  checkout: "This is a checkout form — expect name, full address, email, and phone.",
+  profile: "This is a profile/account form — fill known personal details.",
+};
+
+function pageContextSection(ctx: PromptPageContext | undefined): string {
+  if (!ctx) return "";
+  const kind = ctx.formKind ? `${ctx.formKind} form` : "form";
+  const hint = ctx.formKind ? ` ${FORM_KIND_HINT[ctx.formKind]}` : "";
+  return `Page context: a ${kind} at ${ctx.url} ("${ctx.title}").${hint}\n\n`;
+}
 
 export const SYSTEM_PROMPT = `You are a form-field mapping assistant. Your job is to map web form fields to keys in the user's saved profile so the user can autofill the form.
 
@@ -60,7 +76,8 @@ Rules:
 export function buildUserPrompt(
   profile: Profile,
   fields: ScannedField[],
-  claimedKeys?: string[]
+  claimedKeys?: string[],
+  pageContext?: PromptPageContext
 ): string {
   const keys = profileKeys(profile);
   const profileLines = keys.map((key) => {
@@ -119,7 +136,7 @@ export function buildUserPrompt(
       ? `\n\nKeys already claimed by parser-resolved fields on this form: [${claimedKeys.join(", ")}]\nAvoid reusing these keys for other fields unless the new field clearly asks for the same data.`
       : "";
 
-  return `${profileSection}\n\n${fieldSection}${claimedSection}\n\nReturn a single JSON object with a "mappings" array — one entry per field — strictly matching the provided JSON schema.`;
+  return `${pageContextSection(pageContext)}${profileSection}\n\n${fieldSection}${claimedSection}\n\nReturn a single JSON object with a "mappings" array — one entry per field — strictly matching the provided JSON schema.`;
 }
 
 export function getOutputJsonSchema(): Record<string, unknown> {
