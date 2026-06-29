@@ -124,6 +124,24 @@ function evaluateFields(fields: ScannedField[]): number {
   return 0;
 }
 
+export interface DetectionDiagnostics {
+  count: number;
+  triggered: { label: string; type: string; category: Category }[];
+}
+
+export function diagnose(root: Document | HTMLElement = document): DetectionDiagnostics {
+  const fields = scanFields(root);
+  const count = evaluateFields(fields);
+  const triggered: DetectionDiagnostics["triggered"] = [];
+  for (const f of fields) {
+    if (!isCountedType(f.type)) continue;
+    if (isInExcludedContainer(f.selector)) continue;
+    const category = categoryFor(f);
+    if (category) triggered.push({ label: f.label, type: f.type, category });
+  }
+  return { count, triggered };
+}
+
 export function startDetector(onChange: (count: number) => void): () => void {
   if (SKIP_PROTOCOLS.includes(window.location.protocol)) {
     return () => {};
