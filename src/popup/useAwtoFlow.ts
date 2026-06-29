@@ -160,6 +160,7 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
   const stateRef = useRef<FlowState>(INITIAL_STATE);
   const fieldsRef = useRef<ScannedField[]>([]);
   const portRef = useRef<chrome.runtime.Port | null>(null);
+  const pageContextRef = useRef<import("@/shared/page-context").PromptPageContext | undefined>(undefined);
 
   useEffect(() => {
     stateRef.current = state;
@@ -310,6 +311,7 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
 
         setState((s) => ({ ...s, status: "mapping", fields, loadingFields: fields }));
         fieldsRef.current = fields;
+        pageContextRef.current = scanReply.pageContext;
 
         const profile = await loadProfileFn();
         if (cancelled) return;
@@ -329,6 +331,7 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
           fields,
           profile,
           tabId: tab.id,
+          pageContext: pageContextRef.current,
         });
         // The reply arrives via the port.onMessage listener registered in
         // the connect-effect above.
@@ -515,6 +518,7 @@ export function useAwtoFlow(deps: UseAwtoFlowDeps = {}): UseAwtoFlowResult {
       profile,
       tabId,
       bypassCache: true,
+      pageContext: pageContextRef.current,
     });
   }, []);
 

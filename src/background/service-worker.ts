@@ -138,7 +138,7 @@ export async function handleMessage(
             const result = await hybrid(
               message.profile,
               chunk,
-              { ...settings, signal: deps.signal, claimedKeys }
+              { ...settings, signal: deps.signal, claimedKeys, pageContext: message.pageContext }
             );
             const sanitized = sanitizeMappings(chunk, result.response.mappings);
             llmMappings.push(...sanitized);

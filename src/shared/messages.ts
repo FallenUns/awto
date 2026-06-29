@@ -1,6 +1,7 @@
 import type { Profile } from "./profile";
 import type { FieldMapping } from "./mapping";
 import type { ConsentLink, ConsentDecision } from "./consent";
+import type { PromptPageContext } from "./page-context";
 
 export interface ScannedField {
   id: number;
@@ -25,13 +26,14 @@ export interface FillValue {
 
 export type AwtoMessage =
   | { type: "scanForm" }
-  | { type: "scanFormResult"; fields: ScannedField[] }
+  | { type: "scanFormResult"; fields: ScannedField[]; pageContext?: PromptPageContext }
   | {
       type: "mapFields";
       fields: ScannedField[];
       profile: Profile;
       tabId?: number;
       bypassCache?: boolean;
+      pageContext?: PromptPageContext;
     }
   | { type: "mapFieldsProgress"; mappings: FieldMapping[] }
   | { type: "mapFieldsConsent"; consent: ConsentDecision[] }

@@ -4,6 +4,7 @@ import { fillFields } from "./form-filler";
 import { startDetector } from "./detector";
 import { mountWidget } from "./widget";
 import { hydrateAriaSettings } from "./aria-settings";
+import { assessPageContext, buildPromptPageContext } from "@/shared/page-context";
 
 void hydrateAriaSettings();
 
@@ -19,7 +20,10 @@ const widget = mountWidget(async () => {
 chrome.runtime.onMessage.addListener(
   (message: AwtoMessage, _sender, sendResponse) => {
     if (message.type === "scanForm") {
-      sendResponse({ type: "scanFormResult", fields: scanFields(document) });
+      const fields = scanFields(document);
+      const ctx = assessPageContext(window.location, fields);
+      const pageContext = buildPromptPageContext(window.location, document.title, ctx);
+      sendResponse({ type: "scanFormResult", fields, pageContext });
     } else if (message.type === "fillForm") {
       fillFields(document, message.values)
         .then((result) => {

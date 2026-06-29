@@ -2,6 +2,7 @@ import { LLMResponseSchema, type LLMResponse } from "@/shared/mapping";
 import type { Profile } from "@/shared/profile";
 import type { ScannedField } from "@/shared/messages";
 import { SYSTEM_PROMPT, buildUserPrompt, getOutputJsonSchema } from "./prompt";
+import type { PromptPageContext } from "@/shared/page-context";
 
 // Ollama answers only allow-listed origins. Chrome attaches a
 // "chrome-extension://<id>" Origin that is rejected with 403 unless the user
@@ -28,6 +29,7 @@ export interface LocalCallOpts {
   timeoutMs?: number;
   signal?: AbortSignal;
   claimedKeys?: string[];
+  pageContext?: PromptPageContext;
 }
 
 function joinUrl(base: string, path: string): string {
@@ -48,7 +50,7 @@ export async function callLocal(
     format: getOutputJsonSchema(),
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: buildUserPrompt(profile, fields, opts.claimedKeys) },
+      { role: "user", content: buildUserPrompt(profile, fields, opts.claimedKeys, opts.pageContext) },
     ],
     options: { temperature: 0 },
   };
