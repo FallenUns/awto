@@ -24,7 +24,7 @@ User decisions (brainstorm, 2026-06-30):
 | Question | Decision |
 |---|---|
 | Where context lives | **New pure module `src/shared/page-context.ts`** exporting `assessPageContext(location, fields) → PageContext`. Pure and unit-testable; reused by the detector (content) and threaded to the LLM prompt. |
-| `formKind` classification | Lowercase `hostname + pathname + search`; match URL **path segments / word boundaries** (not raw substring, to avoid e.g. "blogin") against keyword sets. Categories + precedence: `register` > `application` > `checkout` > `profile` > `auth` > `null`. |
+| `formKind` classification | Lowercase `hostname + pathname + search`; match URL **path segments / word boundaries** (not raw substring, to avoid e.g. "blogin") against keyword sets. Categories + precedence: `register` > `application` > `checkout` > `auth` > `profile` > `null` (auth outranks profile so `/account/sign-in` classifies as a login). |
 | `auth` keywords | login, log-in, signin, sign-in, logon, auth, authenticate |
 | `register` keywords | signup, sign-up, register, registration, join, create-account, createaccount, new-account, get-started |
 | `application` keywords | apply, application, careers, career, jobs, job, onboarding, recruit, hr |

@@ -16,7 +16,7 @@
 - Detector change must be **additive**: every page that fires today must still fire (the existing `personalCount >= 2 && (hasStrong || categories.size >= 3)` rule stays intact).
 - URL match alone never fires: `personalCount === 0` always returns 0.
 - Privacy: the LLM receives host + pathname only — never the query string.
-- `FormKind` precedence (highest first): `register` > `application` > `checkout` > `profile` > `auth`.
+- `FormKind` precedence (highest first): `register` > `application` > `checkout` > `auth` > `profile` (auth outranks profile so `/account/sign-in` classifies as a login).
 
 ---
 
@@ -143,7 +143,7 @@ const KEYWORDS: Record<FormKind, string[]> = {
   auth: ["login", "log-in", "signin", "sign-in", "logon", "auth", "authenticate"],
 };
 
-const PRECEDENCE: FormKind[] = ["register", "application", "checkout", "profile", "auth"];
+const PRECEDENCE: FormKind[] = ["register", "application", "checkout", "auth", "profile"];
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
