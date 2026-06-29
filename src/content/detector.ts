@@ -15,10 +15,10 @@ const CATEGORY_KEYWORDS: Record<Category, string[]> = {
     "full name", "middle name", "preferred name", "nickname",
   ],
   contact: [
-    "email", "e-mail", "phone", "telephone", "mobile", "cell phone", " tel ",
+    "email", "e-mail", "phone", "telephone", "mobile", "cell phone", "tel",
   ],
   address: [
-    "street", "city", "town", "state ", "province", "country",
+    "street", "city", "town", "state", "province", "country",
     "address line", "street address", "address1", "address 1",
     "suburb", "postcode", "zip code", "postal code",
   ],
@@ -39,9 +39,24 @@ const CATEGORY_KEYWORDS: Record<Category, string[]> = {
 };
 
 const SEARCH_KEYWORDS = [
-  "search", "query", "find ", " find", "lookup", "filter",
+  "search", "query", "find", "lookup", "filter",
   "go to file", "jump to",
 ];
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function compileKeywords(keywords: string[]): RegExp {
+  return new RegExp(`\\b(?:${keywords.map(escapeRegExp).join("|")})\\b`, "i");
+}
+
+const SEARCH_RE = compileKeywords(SEARCH_KEYWORDS);
+const CATEGORY_RES = Object.fromEntries(
+  (Object.entries(CATEGORY_KEYWORDS) as [Category, string[]][]).map(
+    ([cat, keywords]) => [cat, compileKeywords(keywords)]
+  )
+) as Record<Category, RegExp>;
 
 const COUNTED_TYPES = new Set([
   "text", "email", "tel", "number", "url", "textarea", "select",
@@ -80,10 +95,10 @@ function isInExcludedContainer(selector: string): boolean {
 }
 
 function categoryFor(field: ScannedField): Category | null {
-  const haystack = ` ${field.label.toLowerCase()} ${(field.placeholder ?? "").toLowerCase()} `;
-  if (SEARCH_KEYWORDS.some((k) => haystack.includes(k))) return null;
-  for (const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS) as [Category, string[]][]) {
-    if (keywords.some((k) => haystack.includes(k))) return cat;
+  const haystack = `${field.label} ${field.placeholder ?? ""}`;
+  if (SEARCH_RE.test(haystack)) return null;
+  for (const cat of Object.keys(CATEGORY_RES) as Category[]) {
+    if (CATEGORY_RES[cat].test(haystack)) return cat;
   }
   return null;
 }
