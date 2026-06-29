@@ -183,38 +183,67 @@ describe("callLocal", () => {
     );
   });
 
-  it("throws LocalLLMError when message.content is not valid JSON", async () => {
-    (fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+  it("retries once when message.content is not valid JSON, then fails", async () => {
+    const f = vi.fn().mockResolvedValue(
       mockFetchResponse({
         ok: true,
         jsonValue: { message: { content: "not json at all" } },
       })
     );
-    await expect(callLocal(profile, fields, opts)).rejects.toThrow(/JSON/);
+    vi.stubGlobal("fetch", f);
+    await expect(callLocal(profile, fields, opts)).rejects.toBeInstanceOf(
+      LocalLLMError
+    );
+    expect(f).toHaveBeenCalledTimes(2);
   });
 
-  it("throws LocalLLMError when content fails schema validation", async () => {
-    (fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+  it("recovers when the retry returns valid output after a malformed first attempt", async () => {
+    const malformed = JSON.stringify({ mappings: [{}] }); // empty mapping object
+    const f = vi
+      .fn()
+      .mockResolvedValueOnce(
+        mockFetchResponse({
+          ok: true,
+          jsonValue: { message: { content: malformed } },
+        })
+      )
+      .mockResolvedValueOnce(
+        mockFetchResponse({
+          ok: true,
+          jsonValue: { message: { content: JSON.stringify(validLLMResponse) } },
+        })
+      );
+    vi.stubGlobal("fetch", f);
+
+    const result = await callLocal(profile, fields, opts);
+
+    expect(result.mappings[0]?.profileKey).toBe("firstName");
+    expect(f).toHaveBeenCalledTimes(2);
+    const secondBody = JSON.parse((f.mock.calls[1] as [string, RequestInit])[1].body as string);
+    expect(secondBody.options.temperature).toBeGreaterThan(0); // break deterministic bad output
+    expect(secondBody.messages.length).toBeGreaterThan(2); // base messages + repair hint
+    expect(JSON.stringify(secondBody.messages)).toMatch(/schema|format|did not match/i);
+  });
+
+  it("retries then throws a clear, actionable error (not a raw Zod dump) when output stays malformed", async () => {
+    const f = vi.fn().mockResolvedValue(
       mockFetchResponse({
         ok: true,
-        jsonValue: {
-          message: {
-            content: JSON.stringify({
-              mappings: [
-                {
-                  fieldId: 0,
-                  actionType: "fill",
-                  // missing required fields
-                },
-              ],
-            }),
-          },
-        },
+        jsonValue: { message: { content: JSON.stringify({ mappings: [{}] }) } },
       })
     );
-    await expect(callLocal(profile, fields, opts)).rejects.toThrow(
-      /schema validation/i
-    );
+    vi.stubGlobal("fetch", f);
+
+    let err: Error | null = null;
+    try {
+      await callLocal(profile, fields, opts);
+    } catch (e) {
+      err = e as Error;
+    }
+    expect(err).toBeInstanceOf(LocalLLMError);
+    expect(f).toHaveBeenCalledTimes(2); // retried once
+    expect(err!.message).not.toMatch(/fieldId|Required/); // no raw Zod path noise
+    expect(err!.message).toMatch(/format|model|cloud/i); // actionable guidance
   });
 
   it("throws LocalLLMError when the response body is not JSON", async () => {

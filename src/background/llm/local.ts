@@ -37,6 +37,24 @@ function joinUrl(base: string, path: string): string {
   return `${trimmed}${path}`;
 }
 
+// Small local models (e.g. llama3.2:3b) intermittently emit empty or partial
+// mapping objects under structured output. On the second attempt we nudge with
+// an explicit repair instruction and a non-zero temperature to break the
+// deterministic bad output.
+const SCHEMA_REPAIR_HINT =
+  'Your previous response did not match the required JSON schema. Return ONLY a ' +
+  'single JSON object with a "mappings" array — one entry per field — and every ' +
+  'property present on every entry (fieldId, actionType, profileKey, suggestedKey, ' +
+  "promptText, reason, confidence). No prose, no markdown.";
+
+function malformedOutputHelp(model: string): string {
+  return (
+    `The local model (${model}) returned output that did not match the expected ` +
+    `format, even after a retry. Try a more capable model (e.g. llama3.1:8b) in ` +
+    `Options, or add an Anthropic API key to enable cloud fallback for hard forms.`
+  );
+}
+
 export async function callLocal(
   profile: Profile,
   fields: ScannedField[],
@@ -44,17 +62,54 @@ export async function callLocal(
 ): Promise<LLMResponse> {
   const url = joinUrl(opts.ollamaUrl, "/api/chat");
   const timeoutMs = opts.timeoutMs ?? 30000;
-  const body = {
-    model: opts.ollamaModel,
-    stream: false,
-    format: getOutputJsonSchema(),
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: buildUserPrompt(profile, fields, opts.claimedKeys, opts.pageContext) },
-    ],
-    options: { temperature: 0 },
-  };
+  const format = getOutputJsonSchema();
+  const baseMessages = [
+    { role: "system", content: SYSTEM_PROMPT },
+    {
+      role: "user",
+      content: buildUserPrompt(profile, fields, opts.claimedKeys, opts.pageContext),
+    },
+  ];
 
+  const MAX_ATTEMPTS = 2;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const body = {
+      model: opts.ollamaModel,
+      stream: false,
+      format,
+      messages:
+        attempt === 0
+          ? baseMessages
+          : [...baseMessages, { role: "user", content: SCHEMA_REPAIR_HINT }],
+      options: { temperature: attempt === 0 ? 0 : 0.5 },
+    };
+
+    // Transport / HTTP / abort failures throw here and propagate immediately —
+    // they are not malformed output and must not be retried (so hybrid can fall
+    // back to cloud). Only unparseable / schema-invalid output is retried below.
+    const content = await performChat(url, body, opts, timeoutMs);
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      continue;
+    }
+    const result = LLMResponseSchema.safeParse(parsed);
+    if (result.success) {
+      return result.data;
+    }
+  }
+
+  throw new LocalLLMError(malformedOutputHelp(opts.ollamaModel));
+}
+
+async function performChat(
+  url: string,
+  body: unknown,
+  opts: LocalCallOpts,
+  timeoutMs: number
+): Promise<string> {
   const timeoutController = new AbortController();
   const timer = setTimeout(() => timeoutController.abort(), timeoutMs);
 
@@ -117,26 +172,7 @@ export async function callLocal(
   if (content === null) {
     throw new LocalLLMError("Ollama response missing message.content");
   }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(content);
-  } catch (err) {
-    throw new LocalLLMError(
-      `Ollama message.content was not valid JSON: ${stringifyError(err)}`,
-      err
-    );
-  }
-
-  const result = LLMResponseSchema.safeParse(parsed);
-  if (!result.success) {
-    throw new LocalLLMError(
-      `Ollama output failed schema validation: ${result.error.message}`,
-      result.error
-    );
-  }
-
-  return result.data;
+  return content;
 }
 
 function extractMessageContent(payload: unknown): string | null {
