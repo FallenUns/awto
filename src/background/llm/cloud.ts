@@ -3,6 +3,7 @@ import { LLMResponseSchema, type LLMResponse } from "@/shared/mapping";
 import type { Profile } from "@/shared/profile";
 import type { ScannedField } from "@/shared/messages";
 import { SYSTEM_PROMPT, buildUserPrompt, getOutputJsonSchema } from "./prompt";
+import type { PromptPageContext } from "@/shared/page-context";
 
 export class CloudLLMError extends Error {
   override readonly name = "CloudLLMError";
@@ -18,6 +19,7 @@ export interface CloudCallOpts {
   anthropicModel: string;
   signal?: AbortSignal;
   claimedKeys?: string[];
+  pageContext?: PromptPageContext;
 }
 
 const TOOL_NAME = "submit_mapping";
@@ -50,7 +52,7 @@ export async function callCloud(
         messages: [
           {
             role: "user",
-            content: buildUserPrompt(profile, fields, opts.claimedKeys),
+            content: buildUserPrompt(profile, fields, opts.claimedKeys, opts.pageContext),
           },
         ],
         tools: [

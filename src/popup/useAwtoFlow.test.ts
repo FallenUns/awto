@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { AwtoMessage, ScannedField } from "@/shared/messages";
 import type { FieldMapping } from "@/shared/mapping";
 import type { Profile } from "@/shared/profile";
+import type { PromptPageContext } from "@/shared/page-context";
 
 (globalThis as unknown as { chrome: unknown }).chrome = {
   runtime: {
@@ -176,7 +177,11 @@ function makeDeps(
       overrides.sendToTab ??
       vi.fn().mockImplementation(async (_tabId: number, msg: AwtoMessage) => {
         if (msg.type === "scanForm") {
-          return { type: "scanFormResult", fields } satisfies AwtoMessage;
+          return {
+            type: "scanFormResult",
+            fields,
+            pageContext: { url: "acme.com/signin", title: "Sign in", formKind: "auth" },
+          } satisfies AwtoMessage;
         }
         if (msg.type === "fillForm") {
           return {
@@ -828,6 +833,17 @@ describe("useAwtoFlow", () => {
       ])
     );
     expect(setMarketingConsent).toHaveBeenCalledWith("optOut");
+  });
+
+  it("forwards pageContext from scanFormResult into the mapFields message", async () => {
+    const deps = makeDeps();
+    renderFlow(deps);
+    await waitFor(() =>
+      deps.portHandle.posted.some((m) => m.type === "mapFields")
+    );
+    const map = deps.portHandle.posted.find((m) => m.type === "mapFields") as
+      Extract<AwtoMessage, { type: "mapFields" }>;
+    expect(map.pageContext).toEqual({ url: "acme.com/signin", title: "Sign in", formKind: "auth" });
   });
 
   it("disconnects the port on unmount", async () => {

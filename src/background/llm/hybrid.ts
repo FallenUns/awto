@@ -3,6 +3,7 @@ import type { Profile } from "@/shared/profile";
 import type { ScannedField } from "@/shared/messages";
 import { callLocal, type LocalCallOpts } from "./local";
 import { callCloud, type CloudCallOpts } from "./cloud";
+import type { PromptPageContext } from "@/shared/page-context";
 
 export interface HybridCallOpts {
   ollamaUrl: string;
@@ -14,6 +15,7 @@ export interface HybridCallOpts {
   confidenceThreshold: number;
   signal?: AbortSignal;
   claimedKeys?: string[];
+  pageContext?: PromptPageContext;
 }
 
 export interface HybridResult {
@@ -62,12 +64,14 @@ export async function callHybrid(
     timeoutMs: opts.ollamaTimeoutMs,
     signal: opts.signal,
     claimedKeys: opts.claimedKeys,
+    pageContext: opts.pageContext,
   };
   const cloudOpts: CloudCallOpts = {
     anthropicApiKey: opts.anthropicApiKey,
     anthropicModel: opts.anthropicModel,
     signal: opts.signal,
     claimedKeys: opts.claimedKeys,
+    pageContext: opts.pageContext,
   };
 
   let localResponse: LLMResponse | null = null;

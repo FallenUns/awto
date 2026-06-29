@@ -1,4 +1,5 @@
 import type { ScannedField } from "@/shared/messages";
+import { assessPageContext } from "@/shared/page-context";
 import { scanFields } from "./form-scanner";
 
 const INITIAL_DELAY_MS = 250;
@@ -116,8 +117,12 @@ function evaluateFields(fields: ScannedField[]): number {
     }
   }
 
-  if (personalCount < 2) return 0;
+  if (personalCount === 0) return 0;
 
+  const { hasFormContext } = assessPageContext(window.location, fields);
+  if (hasFormContext && personalCount >= 1) return fields.length;
+
+  if (personalCount < 2) return 0;
   const hasStrong = Array.from(categories).some((c) => STRONG_CATEGORIES.has(c));
   if (hasStrong) return fields.length;
   if (categories.size >= 3) return fields.length;

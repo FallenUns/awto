@@ -310,6 +310,53 @@ describe("startDetector", () => {
     vi.advanceTimersByTime(300);
     expect(onChange).toHaveBeenCalledWith(3);
   });
+
+  it("fires on a login form (email + password) on an auth URL", () => {
+    const original = Object.getOwnPropertyDescriptor(window, "location");
+    Object.defineProperty(window, "location", {
+      value: { protocol: "https:", hostname: "accounts.example.com", pathname: "/signin", search: "" },
+      writable: true, configurable: true,
+    });
+    document.body.innerHTML = `
+      <form>
+        <label>Email <input type="email" name="email" /></label>
+        <label>Password <input type="password" name="pw" /></label>
+      </form>
+    `;
+    const onChange = vi.fn();
+    startDetector(onChange);
+    vi.advanceTimersByTime(300);
+    expect(onChange).toHaveBeenCalledWith(2);
+    if (original) Object.defineProperty(window, "location", original);
+  });
+
+  it("fires on a /signup URL with a single name field", () => {
+    const original = Object.getOwnPropertyDescriptor(window, "location");
+    Object.defineProperty(window, "location", {
+      value: { protocol: "https:", hostname: "example.com", pathname: "/signup", search: "" },
+      writable: true, configurable: true,
+    });
+    document.body.innerHTML = `<form><label>First name <input type="text" name="fn" /></label></form>`;
+    const onChange = vi.fn();
+    startDetector(onChange);
+    vi.advanceTimersByTime(300);
+    expect(onChange).toHaveBeenCalledWith(1);
+    if (original) Object.defineProperty(window, "location", original);
+  });
+
+  it("does NOT fire on an auth URL with no fillable personal field (search box only)", () => {
+    const original = Object.getOwnPropertyDescriptor(window, "location");
+    Object.defineProperty(window, "location", {
+      value: { protocol: "https:", hostname: "example.com", pathname: "/login", search: "" },
+      writable: true, configurable: true,
+    });
+    document.body.innerHTML = `<input type="search" name="q" aria-label="Search" />`;
+    const onChange = vi.fn();
+    startDetector(onChange);
+    vi.advanceTimersByTime(300);
+    expect(onChange).toHaveBeenCalledWith(0);
+    if (original) Object.defineProperty(window, "location", original);
+  });
 });
 
 describe("diagnose", () => {
