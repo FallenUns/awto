@@ -45,7 +45,9 @@ const SITES = [
   ["https://www.apple.com", "zero"],
   ["https://www.theguardian.com/international", "zero"],
   ["https://duckduckgo.com", "zero"],
-  ["https://www.quora.com", "zero"],
+  // quora.com intentionally omitted: its logged-out homepage is a sign-in wall
+  // (email + password), so it correctly triggers — and it is also Cloudflare-gated,
+  // making it a non-deterministic regression gate. Like pinterest.com (a signup wall).
   ["https://medium.com", "zero"],
   ["https://news.ycombinator.com", "zero"],
   ["https://www.ikea.com/au/en/cat/sofa-beds-10663/", "zero"],
@@ -53,6 +55,9 @@ const SITES = [
   ["https://github.com/signup", "form"],
   ["https://www.linkedin.com/signup", "form"],
   ["https://accounts.google.com/signup", "form"],
+  ["https://github.com/login", "form"],
+  ["https://accounts.google.com/signin", "form"],
+  ["https://www.dropbox.com/login", "form"],
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
