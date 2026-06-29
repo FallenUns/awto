@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
   },
 };
 
-const { startDetector } = await import("./detector");
+const { startDetector, diagnose } = await import("./detector");
 
 describe("startDetector", () => {
   beforeEach(() => {
@@ -309,5 +309,35 @@ describe("startDetector", () => {
     startDetector(onChange);
     vi.advanceTimersByTime(300);
     expect(onChange).toHaveBeenCalledWith(3);
+  });
+});
+
+describe("diagnose", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("reports the categories that triggered detection", () => {
+    document.body.innerHTML = `
+      <form>
+        <label>Full name <input type="text" name="fullname" /></label>
+        <label>Email <input type="email" name="email" /></label>
+      </form>
+    `;
+    const { count, triggered } = diagnose(document);
+    expect(count).toBeGreaterThan(0);
+    expect(triggered.map((t) => t.category).sort()).toEqual(["contact", "name"]);
+  });
+
+  it("reports no triggers for product options containing words like 'storage'", () => {
+    document.body.innerHTML = `
+      <main>
+        <label><input type="radio" name="v-a" value="1" /> Corner sofa-bed with storage, dark grey</label>
+        <label><input type="radio" name="v-b" value="1" /> 2-seat sofa-bed with storage, beige</label>
+      </main>
+    `;
+    const { count, triggered } = diagnose(document);
+    expect(count).toBe(0);
+    expect(triggered).toEqual([]);
   });
 });
