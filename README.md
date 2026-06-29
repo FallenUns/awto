@@ -98,6 +98,30 @@ Awto uses a local Ollama instance by default for maximum privacy.
    (not `403`) — that confirms `OLLAMA_ORIGINS` is set correctly. A plain `curl`
    sends no `Origin` header, so it can succeed even when the extension is blocked.
 
+   **Still getting HTTP 403 after all of the above?** The most common cause is a
+   stale server: the `OLLAMA_ORIGINS` value is set, but the Ollama process that is
+   *currently running* was started **before** the value existed, so it never
+   inherited it. A normal "Quit Ollama" from the menu bar often just hides the app
+   — the background `ollama serve` keeps holding port 11434 with the old env. Fully
+   stop every Ollama process and relaunch:
+   ```bash
+   # 1. Confirm the value is set for your login session
+   launchctl getenv OLLAMA_ORIGINS        # expect: chrome-extension://*
+
+   # 2. Check whether the RUNNING server actually has it
+   ps eww "$(pgrep -f 'Resources/ollama serve')" | tr ' ' '\n' | grep OLLAMA_ORIGINS \
+     || echo "running server is missing OLLAMA_ORIGINS — restart needed"
+
+   # 3. Kill everything and relaunch so the new server inherits the value
+   pkill -9 -f "Ollama.app"; pkill -9 -f "ollama serve"
+   open -a Ollama
+
+   # 4. Re-test (should now be 200)
+   curl -s -o /dev/null -w "%{http_code}\n" \
+     -H "Origin: chrome-extension://test" http://localhost:11434/api/tags
+   ```
+   After relaunch, step 2's command should print `OLLAMA_ORIGINS=chrome-extension://*`.
+
 ## (Optional) Cloud fallback
 
 Awto can fall back to Anthropic's Claude API for form fills when the local LLM is uncertain or unavailable. To enable this:
