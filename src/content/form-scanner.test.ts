@@ -624,6 +624,22 @@ describe("ARIA checkbox", () => {
       type: "checkbox",
     });
   });
+
+  it("ignores ARIA checkboxes that are row/item selectors inside a grid (e.g. Gmail's select-email boxes)", () => {
+    document.body.innerHTML = `
+      <table role="grid">
+        <tr role="row">
+          <td><div role="checkbox" aria-checked="false" aria-label="Select: unread, LinkedIn Job Alerts"></div></td>
+          <td>LinkedIn Job Alerts</td>
+        </tr>
+        <tr role="row">
+          <td><div role="checkbox" aria-checked="false" aria-label="Select: Netflix sign-in code"></div></td>
+          <td>Netflix</td>
+        </tr>
+      </table>
+    `;
+    expect(scanFields()).toHaveLength(0);
+  });
 });
 
 describe("ARIA textbox (contenteditable)", () => {

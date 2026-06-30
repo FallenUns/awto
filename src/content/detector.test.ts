@@ -124,6 +124,33 @@ describe("startDetector", () => {
     expect(onChange).toHaveBeenCalledWith(0);
   });
 
+  it("ignores a webmail inbox whose row-select checkboxes carry email-snippet labels", () => {
+    const rows = [
+      "Select: unread, LinkedIn Job Alerts, Data Engineer at IBM",
+      "Select: https://www.linkedin.com/in/patrick-adrianus/",
+      "Select: Netflix review who's using your account, patrick@gmail.com",
+      "Select: Hi Patrick, your booking is confirmed. Phone 0421806625",
+      "Select: GitHub you have used 90% of Git LFS storage",
+      "Select: Medibank your upcoming health insurance premium deduction",
+    ]
+      .map(
+        (label) => `
+        <tr role="row">
+          <td><div role="checkbox" aria-checked="false" aria-label="${label}"></div></td>
+          <td>snippet</td>
+        </tr>`
+      )
+      .join("");
+    document.body.innerHTML = `
+      <div role="banner"><input type="text" aria-label="Search mail" /></div>
+      <div role="main"><table role="grid">${rows}</table></div>
+    `;
+    const onChange = vi.fn();
+    startDetector(onChange);
+    vi.advanceTimersByTime(300);
+    expect(onChange).toHaveBeenCalledWith(0);
+  });
+
   it("ignores a product-listing page whose option labels merely contain words like 'storage'", () => {
     document.body.innerHTML = `
       <main>

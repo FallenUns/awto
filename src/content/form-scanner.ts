@@ -57,7 +57,16 @@ const ARIA_QUERIES: AriaQuery[] = [
     collectOptions: (el) => collectRoleOptions(el, "radio"),
     requireOptions: true,
   },
-  { selector: '[role="checkbox"]', type: "checkbox" },
+  // role="checkbox" inside a grid/table/feed is a row/item selector (e.g. Gmail's
+  // "select this email" boxes), not a fillable form control. Their accessible name
+  // is the row's content (email subject/snippet), which otherwise leaks personal-
+  // looking keywords into the detector and lets the LLM map values into them.
+  {
+    selector: '[role="checkbox"]',
+    type: "checkbox",
+    skipIfInside:
+      '[role="grid"], [role="row"], [role="table"], [role="treegrid"], [role="rowgroup"], [role="feed"]',
+  },
   { selector: '[role="textbox"][contenteditable="true"]', type: "text" },
   {
     selector: '[role="combobox"]',
