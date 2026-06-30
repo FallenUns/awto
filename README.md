@@ -122,6 +122,8 @@ Awto uses a local Ollama instance by default for maximum privacy.
    ```
    After relaunch, step 2's command should print `OLLAMA_ORIGINS=chrome-extension://*`.
 
+Having trouble? See **[Troubleshooting](docs/TROUBLESHOOTING.md)** for step-by-step fixes (403/CORS, model downloads, wrong fills, slow models).
+
 ## (Optional) Cloud fallback
 
 Awto can fall back to Anthropic's Claude API for form fills when the local LLM is uncertain or unavailable. To enable this:
