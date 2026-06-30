@@ -3,6 +3,22 @@ import { render, screen, waitFor } from "@testing-library/react";
 import type { AwtoMessage } from "@/shared/messages";
 import type { FlowState, FlowStatus } from "./types";
 
+// Prevent loadLLMSettings async state update from producing act() warnings.
+// Use a resolved thenable that runs its callback synchronously so no async
+// microtask fires a setState outside act().
+vi.mock("@/shared/storage", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/shared/storage")>();
+  return {
+    ...actual,
+    loadLLMSettings: () => ({
+      then: (cb: (v: typeof actual.DEFAULT_LLM_SETTINGS) => void) => {
+        cb(actual.DEFAULT_LLM_SETTINGS);
+        return { catch: () => ({}) };
+      },
+    }),
+  };
+});
+
 (globalThis as unknown as { chrome: unknown }).chrome = {
   runtime: {
     onMessage: { addListener: vi.fn() },
@@ -95,6 +111,19 @@ describe("formatFailureReason", () => {
 });
 
 function mockFlow(overrides: { status: FlowStatus; state: Partial<FlowState> }) {
+  // Re-apply storage mock after vi.resetModules() clears the top-level vi.mock.
+  vi.doMock("@/shared/storage", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("@/shared/storage")>();
+    return {
+      ...actual,
+      loadLLMSettings: () => ({
+        then: (cb: (v: typeof actual.DEFAULT_LLM_SETTINGS) => void) => {
+          cb(actual.DEFAULT_LLM_SETTINGS);
+          return { catch: () => ({}) };
+        },
+      }),
+    };
+  });
   vi.doMock("./useAwtoFlow", () => ({
     useAwtoFlow: () => ({
       status: overrides.status,
