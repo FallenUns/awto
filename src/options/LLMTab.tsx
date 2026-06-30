@@ -112,7 +112,7 @@ export function LLMTab({
         </div>
 
         <div className="awto-field">
-          <label className="awto-label">Model</label>
+          <span className="awto-label">Model</span>
           <ModelCatalog
             selectedModel={settings.ollamaModel}
             installedModels={installedModels}

@@ -1,21 +1,23 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { LLMTab } from "./LLMTab";
 import { DEFAULT_LLM_SETTINGS, type LLMSettings } from "@/shared/storage";
 
-function renderLLMTab(overrides: Partial<LLMSettings> = {}) {
+async function renderLLMTab(overrides: Partial<LLMSettings> = {}) {
   const settings: LLMSettings = { ...DEFAULT_LLM_SETTINGS, ...overrides };
   const onUpdate = vi.fn();
   const onTestOllama = vi.fn().mockResolvedValue({ ok: true, models: [] });
 
-  render(
-    <LLMTab
-      settings={settings}
-      saveStatus="idle"
-      onUpdate={onUpdate}
-      onTestOllama={onTestOllama}
-    />
-  );
+  await act(async () => {
+    render(
+      <LLMTab
+        settings={settings}
+        saveStatus="idle"
+        onUpdate={onUpdate}
+        onTestOllama={onTestOllama}
+      />
+    );
+  });
 
   return { onUpdate, onTestOllama };
 }
@@ -35,24 +37,24 @@ it("renders the model catalog with the recommended model", async () => {
 });
 
 describe("LLMTab — ARIA forms toggle", () => {
-  it("renders the 'Fill custom-widget forms' toggle reflecting current setting", () => {
-    renderLLMTab({ enableAriaForms: true });
+  it("renders the 'Fill custom-widget forms' toggle reflecting current setting", async () => {
+    await renderLLMTab({ enableAriaForms: true });
     const toggle = screen.getByLabelText(
       /fill custom-widget forms/i
     ) as HTMLInputElement;
     expect(toggle.checked).toBe(true);
   });
 
-  it("renders the toggle as unchecked when disabled", () => {
-    renderLLMTab({ enableAriaForms: false });
+  it("renders the toggle as unchecked when disabled", async () => {
+    await renderLLMTab({ enableAriaForms: false });
     const toggle = screen.getByLabelText(
       /fill custom-widget forms/i
     ) as HTMLInputElement;
     expect(toggle.checked).toBe(false);
   });
 
-  it("clicking the toggle calls onUpdate with the new value", () => {
-    const { onUpdate } = renderLLMTab({ enableAriaForms: true });
+  it("clicking the toggle calls onUpdate with the new value", async () => {
+    const { onUpdate } = await renderLLMTab({ enableAriaForms: true });
     const toggle = screen.getByLabelText(
       /fill custom-widget forms/i
     ) as HTMLInputElement;
