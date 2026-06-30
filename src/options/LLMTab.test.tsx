@@ -20,6 +20,20 @@ function renderLLMTab(overrides: Partial<LLMSettings> = {}) {
   return { onUpdate, onTestOllama };
 }
 
+it("renders the model catalog with the recommended model", async () => {
+  const onUpdate = vi.fn();
+  const onTestOllama = vi.fn().mockResolvedValue({ ok: true, models: ["llama3.2:3b"] });
+  render(
+    <LLMTab
+      settings={{ ...DEFAULT_LLM_SETTINGS }}
+      saveStatus="idle"
+      onUpdate={onUpdate}
+      onTestOllama={onTestOllama}
+    />
+  );
+  expect(await screen.findByText("Qwen 2.5 7B")).toBeTruthy();
+});
+
 describe("LLMTab — ARIA forms toggle", () => {
   it("renders the 'Fill custom-widget forms' toggle reflecting current setting", () => {
     renderLLMTab({ enableAriaForms: true });

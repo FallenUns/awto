@@ -2,14 +2,13 @@ import { useEffect, useState } from "react";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import type { LLMSettings } from "@/shared/storage";
 import type { SaveStatus, TestOllamaConnectionResult } from "./useOptionsState";
+import { ModelCatalog } from "./ModelCatalog";
 
 const ANTHROPIC_MODELS = [
   "claude-opus-4-7",
   "claude-sonnet-4-7",
   "claude-haiku-4-7",
 ];
-
-const CUSTOM_MODEL_SENTINEL = "__awto_custom__";
 
 interface LLMTabProps {
   settings: LLMSettings;
@@ -33,7 +32,6 @@ export function LLMTab({
   const [showKey, setShowKey] = useState(false);
   const [testResult, setTestResult] = useState<TestResult>({ kind: "idle" });
   const [installedModels, setInstalledModels] = useState<string[] | null>(null);
-  const [customMode, setCustomMode] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,19 +75,6 @@ export function LLMTab({
     }
   }
 
-  const modelOptions = installedModels ?? [];
-  const currentModelInList = modelOptions.includes(settings.ollamaModel);
-  const showCustomInput = customMode || (installedModels !== null && !currentModelInList);
-
-  function handleModelSelect(value: string) {
-    if (value === CUSTOM_MODEL_SENTINEL) {
-      setCustomMode(true);
-      return;
-    }
-    setCustomMode(false);
-    onUpdate({ ollamaModel: value });
-  }
-
   return (
     <div className="awto-tabpanel" aria-live="polite">
       <section className="awto-card" aria-labelledby="card-ollama">
@@ -127,59 +112,14 @@ export function LLMTab({
         </div>
 
         <div className="awto-field">
-          <label htmlFor="ollama-model" className="awto-label">
-            Model name
-          </label>
-          {installedModels === null ? (
-            <input
-              id="ollama-model"
-              className="awto-input"
-              type="text"
-              value={settings.ollamaModel}
-              onChange={(e) => onUpdate({ ollamaModel: e.target.value })}
-              placeholder="llama3.2"
-            />
-          ) : (
-            <select
-              id="ollama-model"
-              className="awto-input"
-              value={
-                showCustomInput
-                  ? CUSTOM_MODEL_SENTINEL
-                  : currentModelInList
-                    ? settings.ollamaModel
-                    : CUSTOM_MODEL_SENTINEL
-              }
-              onChange={(e) => handleModelSelect(e.target.value)}
-            >
-              {modelOptions.length === 0 && (
-                <option value="" disabled>
-                  No models installed — run `ollama pull llama3.2`
-                </option>
-              )}
-              {modelOptions.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-              <option value={CUSTOM_MODEL_SENTINEL}>Custom…</option>
-            </select>
-          )}
-          {showCustomInput && installedModels !== null && (
-            <input
-              className="awto-input awto-input--custom"
-              type="text"
-              value={settings.ollamaModel}
-              onChange={(e) => onUpdate({ ollamaModel: e.target.value })}
-              placeholder="llama3.2"
-              aria-label="Custom model name"
-            />
-          )}
-          <p className="awto-helper--inline">
-            {installedModels === null
-              ? "Connect to Ollama to see installed models."
-              : `${modelOptions.length} model${modelOptions.length === 1 ? "" : "s"} installed locally.`}
-          </p>
+          <label className="awto-label">Model</label>
+          <ModelCatalog
+            selectedModel={settings.ollamaModel}
+            installedModels={installedModels}
+            ollamaUrl={settings.ollamaUrl}
+            onSelectModel={(id) => onUpdate({ ollamaModel: id })}
+            onModelsChanged={() => void handleTest()}
+          />
         </div>
 
         <div className="awto-field">
