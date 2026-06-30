@@ -6,6 +6,8 @@ import { ActionBar } from "./ActionBar";
 import { SectionHeader } from "./SectionHeader";
 import { ConsentRow } from "./ConsentRow";
 import { useAwtoFlow } from "./useAwtoFlow";
+import { HeavyModelBanner } from "./HeavyModelBanner";
+import { loadLLMSettings } from "@/shared/storage";
 import type { FillRow } from "./types";
 
 const REVIEW_THRESHOLD = 0.85;
@@ -33,6 +35,11 @@ export function Popup() {
   const listRef = useRef<HTMLDivElement>(null);
   const [promoted, setPromoted] = useState<Set<number>>(new Set());
   const [skippedCollapsed, setSkippedCollapsed] = useState(true);
+  const [ollamaModel, setOllamaModel] = useState("");
+
+  useEffect(() => {
+    void loadLLMSettings().then((s) => setOllamaModel(s.ollamaModel));
+  }, []);
 
   useEffect(() => {
     if (listRef.current) listRef.current.scrollTop = 0;
@@ -78,6 +85,10 @@ export function Popup() {
 
   return (
     <div className="awto-popup">
+      <HeavyModelBanner
+        model={ollamaModel}
+        deviceMemoryGB={(navigator as Navigator & { deviceMemory?: number }).deviceMemory}
+      />
       <Header
         status={status}
         readyCount={willFill.length}

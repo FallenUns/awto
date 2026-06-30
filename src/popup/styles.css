@@ -613,3 +613,6 @@ button.awto-section-header:focus-visible {
 .awto-consent-row__links { display: flex; flex-wrap: wrap; gap: 8px; }
 .awto-consent-row__link { font-size: 12px; color: #22c55e; text-decoration: underline; }
 .awto-consent-row__toggle { width: 36px; height: 22px; flex-shrink: 0; cursor: pointer; }
+
+.awto-heavy-banner { display: flex; align-items: center; gap: 7px; background: rgba(245,158,11,.12); border-bottom: 1px solid rgba(245,158,11,.3); color: #FCD9A0; font-size: 12px; padding: 7px 12px; }
+.awto-heavy-banner a { color: #F59E0B; font-weight: 600; }

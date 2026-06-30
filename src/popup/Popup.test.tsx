@@ -3,6 +3,22 @@ import { render, screen, waitFor } from "@testing-library/react";
 import type { AwtoMessage } from "@/shared/messages";
 import type { FlowState, FlowStatus } from "./types";
 
+// Prevent loadLLMSettings async state update from producing act() warnings.
+// Use a resolved thenable that runs its callback synchronously so no async
+// microtask fires a setState outside act().
+vi.mock("@/shared/storage", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/shared/storage")>();
+  return {
+    ...actual,
+    loadLLMSettings: () => ({
+      then: (cb: (v: typeof actual.DEFAULT_LLM_SETTINGS) => void) => {
+        cb(actual.DEFAULT_LLM_SETTINGS);
+        return { catch: () => ({}) };
+      },
+    }),
+  };
+});
+
 (globalThis as unknown as { chrome: unknown }).chrome = {
   runtime: {
     onMessage: { addListener: vi.fn() },
@@ -95,6 +111,19 @@ describe("formatFailureReason", () => {
 });
 
 function mockFlow(overrides: { status: FlowStatus; state: Partial<FlowState> }) {
+  // Re-apply storage mock after vi.resetModules() clears the top-level vi.mock.
+  vi.doMock("@/shared/storage", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("@/shared/storage")>();
+    return {
+      ...actual,
+      loadLLMSettings: () => ({
+        then: (cb: (v: typeof actual.DEFAULT_LLM_SETTINGS) => void) => {
+          cb(actual.DEFAULT_LLM_SETTINGS);
+          return { catch: () => ({}) };
+        },
+      }),
+    };
+  });
   vi.doMock("./useAwtoFlow", () => ({
     useAwtoFlow: () => ({
       status: overrides.status,
@@ -206,6 +235,48 @@ describe("Popup progressive row resolution", () => {
     renderDyn(<PopupDyn />);
     const fillBtn = screenDyn.getByRole("button", { name: /fill 1 field/i });
     expect((fillBtn as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
+describe("Popup heavy-model banner wiring", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    Object.defineProperty(navigator, "deviceMemory", {
+      value: undefined,
+      configurable: true,
+    });
+  });
+
+  it("shows the heavy-model banner when a heavy model is the selected local model", async () => {
+    Object.defineProperty(navigator, "deviceMemory", {
+      value: 8,
+      configurable: true,
+    });
+
+    vi.doMock("@/shared/storage", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("@/shared/storage")>();
+      return {
+        ...actual,
+        loadLLMSettings: () => ({
+          then: (cb: (v: typeof actual.DEFAULT_LLM_SETTINGS) => void) => {
+            cb({ ...actual.DEFAULT_LLM_SETTINGS, ollamaModel: "gemma3:27b" });
+            return { catch: () => ({}) };
+          },
+        }),
+      };
+    });
+
+    const { Popup: PopupDyn } = await import("./Popup");
+    const { render: renderDyn, screen: screenDyn } = await import("@testing-library/react");
+    renderDyn(<PopupDyn />);
+
+    const banner = await screenDyn.findByRole("note");
+    expect(banner.textContent).toMatch(/may be slow|may fail|hardware/i);
+    const link = banner.querySelector("a");
+    expect(link?.href).toContain("TROUBLESHOOTING.md");
   });
 });
 
