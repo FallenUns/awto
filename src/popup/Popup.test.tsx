@@ -238,6 +238,48 @@ describe("Popup progressive row resolution", () => {
   });
 });
 
+describe("Popup heavy-model banner wiring", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    Object.defineProperty(navigator, "deviceMemory", {
+      value: undefined,
+      configurable: true,
+    });
+  });
+
+  it("shows the heavy-model banner when a heavy model is the selected local model", async () => {
+    Object.defineProperty(navigator, "deviceMemory", {
+      value: 8,
+      configurable: true,
+    });
+
+    vi.doMock("@/shared/storage", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("@/shared/storage")>();
+      return {
+        ...actual,
+        loadLLMSettings: () => ({
+          then: (cb: (v: typeof actual.DEFAULT_LLM_SETTINGS) => void) => {
+            cb({ ...actual.DEFAULT_LLM_SETTINGS, ollamaModel: "gemma3:27b" });
+            return { catch: () => ({}) };
+          },
+        }),
+      };
+    });
+
+    const { Popup: PopupDyn } = await import("./Popup");
+    const { render: renderDyn, screen: screenDyn } = await import("@testing-library/react");
+    renderDyn(<PopupDyn />);
+
+    const banner = await screenDyn.findByRole("note");
+    expect(banner.textContent).toMatch(/may be slow|may fail|hardware/i);
+    const link = banner.querySelector("a");
+    expect(link?.href).toContain("TROUBLESHOOTING.md");
+  });
+});
+
 describe("Popup grouped sections", () => {
   beforeEach(() => {
     vi.resetModules();
