@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Download, Trash2, Check, Loader2, TriangleAlert, HelpCircle } from "lucide-react";
 import {
   MODEL_CATALOG, findCatalogModel, isHeavyForDevice, TROUBLESHOOTING_URL,
@@ -44,6 +44,7 @@ export function ModelCatalog({
 
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const installed = useMemo(() => new Set(installedModels ?? []), [installedModels]);
+  const customInputRef = useRef<HTMLInputElement>(null);
 
   const recommended = MODEL_CATALOG.filter((m) => m.tier !== "heavy");
   const heavy = MODEL_CATALOG.filter((m) => m.tier === "heavy");
@@ -112,8 +113,8 @@ export function ModelCatalog({
         <div className="awto-model-row__main">
           <div className="awto-model-row__name">
             {model.displayName}
-            {model.recommended && <span className="awto-badge awto-badge--rec" aria-label="Recommended">★</span>}
-            <span className={`awto-badge awto-badge--tier-${model.tier}`} data-tier={model.tier} aria-label={model.tier} />
+            {model.recommended && <span className="awto-badge awto-badge--rec" aria-label="Recommended">★ Recommended</span>}
+            <span className={`awto-badge awto-badge--tier-${model.tier}`} aria-label={model.tier}>{model.tier}</span>
           </div>
           {state.kind === "downloading" ? (
             <div className="awto-prog">
@@ -199,13 +200,14 @@ export function ModelCatalog({
         <label className="awto-label" htmlFor="custom-model">Use a custom model</label>
         <div className="awto-custom__row">
           <input
+            ref={customInputRef}
             id="custom-model"
             className="awto-input"
             placeholder="custom model id, e.g. mistral-nemo:12b"
             defaultValue={findCatalogModel(selectedModel) ? "" : selectedModel}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                const v = (e.target as HTMLInputElement).value.trim();
+                const v = customInputRef.current?.value.trim();
                 if (v) onSelectModel(v);
               }
             }}
@@ -213,8 +215,7 @@ export function ModelCatalog({
           <button
             type="button" className="awto-btn awto-btn--secondary"
             onClick={() => {
-              const el = document.getElementById("custom-model") as HTMLInputElement | null;
-              const v = el?.value.trim();
+              const v = customInputRef.current?.value.trim();
               if (v) onSelectModel(v);
             }}
           >

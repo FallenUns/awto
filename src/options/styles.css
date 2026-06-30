@@ -776,12 +776,9 @@ select.awto-input {
 .awto-model-row__error { color: #FCA5A5; font-size: 12px; margin: 6px 0 0; }
 .awto-model-row__actions { display: flex; align-items: center; gap: 8px; }
 .awto-badge--rec { background: rgba(34,197,94,.14); color: #22C55E; border: 1px solid rgba(34,197,94,.4); }
-.awto-badge--tier-light { background: rgba(148,163,184,.14); color: #94A3B8; border: 1px solid #334155; }
-.awto-badge--tier-light::before { content: attr(data-tier); }
-.awto-badge--tier-balanced { background: rgba(96,165,250,.14); color: #93C5FD; border: 1px solid rgba(96,165,250,.4); }
-.awto-badge--tier-balanced::before { content: attr(data-tier); }
-.awto-badge--tier-heavy { background: rgba(245,158,11,.12); color: #F59E0B; border: 1px solid rgba(245,158,11,.4); }
-.awto-badge--tier-heavy::before { content: attr(data-tier); }
+.awto-badge--tier-light { background: rgba(148,163,184,.14); color: #94A3B8; border: 1px solid #334155; text-transform: capitalize; }
+.awto-badge--tier-balanced { background: rgba(96,165,250,.14); color: #93C5FD; border: 1px solid rgba(96,165,250,.4); text-transform: capitalize; }
+.awto-badge--tier-heavy { background: rgba(245,158,11,.12); color: #F59E0B; border: 1px solid rgba(245,158,11,.4); text-transform: capitalize; }
 .awto-installed { display: inline-flex; align-items: center; gap: 6px; color: #22C55E; font-size: 12.5px; font-weight: 600; }
 .awto-installed--muted { color: #94A3B8; }
 .awto-iconbtn { min-width: 44px; min-height: 44px; border-radius: 9px; border: 1px solid #334155; background: transparent; color: #94A3B8; cursor: pointer; display: grid; place-items: center; }

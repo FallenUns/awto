@@ -25,8 +25,8 @@ function setup(overrides: Partial<React.ComponentProps<typeof ModelCatalog>> = {
 describe("ModelCatalog", () => {
   it("renders recommended and heavy groups", () => {
     setup();
-    expect(screen.getByText(/Recommended/i)).toBeTruthy();
-    expect(screen.getByText(/Heavy/i)).toBeTruthy();
+    expect(screen.getAllByText(/Recommended/i)[0]).toBeTruthy();
+    expect(screen.getAllByText(/Heavy/i)[0]).toBeTruthy();
     expect(screen.getByText("Qwen 2.5 7B")).toBeTruthy();
   });
 
@@ -40,11 +40,11 @@ describe("ModelCatalog", () => {
     await waitFor(() => expect(onModelsChanged).toHaveBeenCalled());
   });
 
-  it("selects an installed model and shows a delete control", () => {
-    const { onSelectModel, del } = setup();
+  it("deletes an installed model after confirm", async () => {
+    const { del } = setup();
     const row = screen.getByText("Llama 3.2 3B").closest("[data-model]") as HTMLElement;
     fireEvent.click(row.querySelector("[data-action='delete']")!);
-    expect(del).toHaveBeenCalledWith("http://localhost:11434", "llama3.2:3b");
+    await waitFor(() => expect(del).toHaveBeenCalledWith("http://localhost:11434", "llama3.2:3b"));
   });
 
   it("warns when a model needs more RAM than the device reports", () => {
