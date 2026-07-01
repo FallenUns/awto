@@ -209,3 +209,41 @@ describe("callCloud", () => {
     await expect(promise).rejects.toMatchObject({ name: "AbortError" });
   });
 });
+
+describe("callCloud — OpenAI-compatible providers", () => {
+  it("POSTs to the provider's /chat/completions and parses the content", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify(validResponse) } }],
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await callCloud(profile, fields, {
+      ...opts,
+      cloudProvider: "openai",
+      cloudApiKeys: { openai: "sk-openai" },
+      cloudModels: { openai: "gpt-4o" },
+    });
+
+    expect(result.mappings[0]?.profileKey).toBe("firstName");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.openai.com/v1/chat/completions");
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer sk-openai");
+    expect(JSON.parse(init.body as string).model).toBe("gpt-4o");
+    vi.unstubAllGlobals();
+  });
+
+  it("throws when a custom provider has no base URL", async () => {
+    await expect(
+      callCloud(profile, fields, {
+        ...opts,
+        cloudProvider: "custom",
+        cloudApiKeys: { custom: "sk-x" },
+        cloudModels: { custom: "m" },
+        cloudBaseUrl: "",
+      })
+    ).rejects.toThrow(CloudLLMError);
+  });
+});

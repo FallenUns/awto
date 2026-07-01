@@ -11,33 +11,36 @@ const ANTHROPIC_MODELS = [
   "claude-haiku-4-7",
 ];
 
-// Multi-provider cloud UI is design-first: the picker and per-provider key/model
-// fields render now, but only Anthropic is wired to the backend today. Non-Anthropic
-// selections live in local draft state and do not persist or drive a call yet.
-// (Decision #22 — remembered.)
+// Provider ids match resolveCloud() in background/llm/cloud.ts. Anthropic uses
+// its own SDK path + anthropicApiKey/anthropicModel; the rest are OpenAI-compatible
+// and persist per-provider under cloudApiKeys/cloudModels.
 interface ProviderDef {
+  id: string;
   name: string;
   keyPlaceholder: string;
   models: string[];
 }
 
 const PROVIDERS: ProviderDef[] = [
-  { name: "Anthropic", keyPlaceholder: "sk-ant-…", models: ANTHROPIC_MODELS },
-  { name: "OpenAI", keyPlaceholder: "sk-…", models: ["gpt-4o", "gpt-4o-mini", "gpt-4.1"] },
+  { id: "anthropic", name: "Anthropic", keyPlaceholder: "sk-ant-…", models: ANTHROPIC_MODELS },
+  { id: "openai", name: "OpenAI", keyPlaceholder: "sk-…", models: ["gpt-4o", "gpt-4o-mini", "gpt-4.1"] },
   {
+    id: "gemini",
     name: "Google Gemini",
     keyPlaceholder: "AIza…",
     models: ["gemini-2.5-pro", "gemini-2.5-flash"],
   },
   {
+    id: "openrouter",
     name: "OpenRouter",
     keyPlaceholder: "sk-or-…",
     models: ["anthropic/claude-3.5-sonnet", "openai/gpt-4o", "meta-llama/llama-3.1-70b"],
   },
   {
+    id: "custom",
     name: "Custom (OpenAI-compatible)",
     keyPlaceholder: "sk-…",
-    models: ["your-model-id"],
+    models: [],
   },
 ];
 
@@ -64,20 +67,16 @@ export function LLMTab({
   const [testResult, setTestResult] = useState<TestResult>({ kind: "idle" });
   const [installedModels, setInstalledModels] = useState<string[] | null>(null);
 
-  const [provider, setProvider] = useState("Anthropic");
-  const [draftKey, setDraftKey] = useState<Record<string, string>>({});
-  const [draftModel, setDraftModel] = useState<Record<string, string>>({});
-
-  const providerDef =
-    PROVIDERS.find((p) => p.name === provider) ?? PROVIDERS[0]!;
-  const isAnthropic = provider === "Anthropic";
+  const provider = settings.cloudProvider || "anthropic";
+  const providerDef = PROVIDERS.find((p) => p.id === provider) ?? PROVIDERS[0]!;
+  const isAnthropic = provider === "anthropic";
 
   const keyValue = isAnthropic
     ? settings.anthropicApiKey
-    : draftKey[provider] ?? "";
+    : settings.cloudApiKeys[provider] ?? "";
   const modelValue = isAnthropic
     ? settings.anthropicModel
-    : draftModel[provider] ?? providerDef.models[0] ?? "";
+    : settings.cloudModels[provider] ?? providerDef.models[0] ?? "";
 
   const fallbackOn = settings.cloudFallbackEnabled;
   const thresholdPct = Math.round(settings.confidenceThreshold * 100);
@@ -126,12 +125,12 @@ export function LLMTab({
 
   function setKeyValue(v: string) {
     if (isAnthropic) onUpdate({ anthropicApiKey: v });
-    else setDraftKey((d) => ({ ...d, [provider]: v }));
+    else onUpdate({ cloudApiKeys: { ...settings.cloudApiKeys, [provider]: v } });
   }
 
   function setModelValue(v: string) {
     if (isAnthropic) onUpdate({ anthropicModel: v });
-    else setDraftModel((d) => ({ ...d, [provider]: v }));
+    else onUpdate({ cloudModels: { ...settings.cloudModels, [provider]: v } });
   }
 
   return (
@@ -170,7 +169,7 @@ export function LLMTab({
             <Cloud size={19} strokeWidth={1.8} aria-hidden="true" />
           </div>
           <div>
-            <div className="awto-pipe-card__title">Cloud · {provider}</div>
+            <div className="awto-pipe-card__title">Cloud · {providerDef.name}</div>
             <div className="awto-pipe-card__sub">Fallback only</div>
           </div>
         </div>
@@ -325,21 +324,36 @@ export function LLMTab({
               id="cloud-provider"
               className="awto-input"
               value={provider}
-              onChange={(e) => setProvider(e.target.value)}
+              onChange={(e) => onUpdate({ cloudProvider: e.target.value })}
             >
               {PROVIDERS.map((p) => (
-                <option key={p.name} value={p.name}>
+                <option key={p.id} value={p.id}>
                   {p.name}
                 </option>
               ))}
             </select>
-            {!isAnthropic && (
-              <p className="awto-helper--inline awto-helper--amber">
-                {provider} is shown for preview — Anthropic is the only provider
-                wired to the backend today.
-              </p>
-            )}
           </div>
+
+          {provider === "custom" && (
+            <div className="awto-field">
+              <label htmlFor="cloud-base-url" className="awto-label">
+                Base URL
+              </label>
+              <input
+                id="cloud-base-url"
+                className="awto-input awto-input--mono"
+                type="url"
+                value={settings.cloudBaseUrl}
+                onChange={(e) => onUpdate({ cloudBaseUrl: e.target.value })}
+                placeholder="https://your-endpoint/v1"
+                spellCheck={false}
+              />
+              <p className="awto-helper--inline">
+                OpenAI-compatible endpoint. Awto POSTs to{" "}
+                <code>&lt;base&gt;/chat/completions</code>.
+              </p>
+            </div>
+          )}
 
           <div className="awto-field-grid awto-field-grid--2">
             <div className="awto-field">
@@ -384,21 +398,32 @@ export function LLMTab({
               <label htmlFor="cloud-model" className="awto-label">
                 Model
               </label>
-              <select
-                id="cloud-model"
-                className="awto-input awto-input--mono"
-                value={modelValue}
-                onChange={(e) => setModelValue(e.target.value)}
-              >
-                {isAnthropic && !providerDef.models.includes(modelValue) && (
-                  <option value={modelValue}>{modelValue}</option>
-                )}
-                {providerDef.models.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
+              {providerDef.models.length > 0 ? (
+                <select
+                  id="cloud-model"
+                  className="awto-input awto-input--mono"
+                  value={modelValue}
+                  onChange={(e) => setModelValue(e.target.value)}
+                >
+                  {!providerDef.models.includes(modelValue) && modelValue && (
+                    <option value={modelValue}>{modelValue}</option>
+                  )}
+                  {providerDef.models.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  id="cloud-model"
+                  className="awto-input awto-input--mono"
+                  value={modelValue}
+                  onChange={(e) => setModelValue(e.target.value)}
+                  placeholder="model id"
+                  spellCheck={false}
+                />
+              )}
             </div>
           </div>
 
