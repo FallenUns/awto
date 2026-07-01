@@ -11,7 +11,12 @@ export const LLMSettingsSchema = z.object({
     .max(600000)
     .default(90000),
   anthropicApiKey: z.string().default(""),
-  anthropicModel: z.string().default("claude-opus-4-7"),
+  anthropicModel: z.string().default("claude-opus-4-8"),
+  // Non-Anthropic cloud providers (all OpenAI-compatible). Keyed by provider id.
+  cloudProvider: z.string().default("anthropic"),
+  cloudApiKeys: z.record(z.string()).default({}),
+  cloudModels: z.record(z.string()).default({}),
+  cloudBaseUrl: z.string().default(""), // custom (OpenAI-compatible) endpoint
   cloudFallbackEnabled: z.boolean().default(true),
   enableAriaForms: z.boolean().default(true),
   confidenceThreshold: z.number().min(0).max(1).default(0.7),

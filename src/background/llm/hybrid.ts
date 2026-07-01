@@ -2,7 +2,7 @@ import type { LLMResponse } from "@/shared/mapping";
 import type { Profile } from "@/shared/profile";
 import type { ScannedField } from "@/shared/messages";
 import { callLocal, type LocalCallOpts } from "./local";
-import { callCloud, type CloudCallOpts } from "./cloud";
+import { callCloud, resolveCloud, type CloudCallOpts } from "./cloud";
 import type { PromptPageContext } from "@/shared/page-context";
 
 export interface HybridCallOpts {
@@ -11,6 +11,10 @@ export interface HybridCallOpts {
   ollamaTimeoutMs?: number;
   anthropicApiKey: string;
   anthropicModel: string;
+  cloudProvider?: string;
+  cloudApiKeys?: Record<string, string>;
+  cloudModels?: Record<string, string>;
+  cloudBaseUrl?: string;
   cloudFallbackEnabled: boolean;
   confidenceThreshold: number;
   signal?: AbortSignal;
@@ -46,7 +50,7 @@ function allConfident(response: LLMResponse, threshold: number): boolean {
 }
 
 function canEscalateToCloud(opts: HybridCallOpts): boolean {
-  return opts.cloudFallbackEnabled && opts.anthropicApiKey.length > 0;
+  return opts.cloudFallbackEnabled && resolveCloud(opts).key.length > 0;
 }
 
 export async function callHybrid(
@@ -69,6 +73,10 @@ export async function callHybrid(
   const cloudOpts: CloudCallOpts = {
     anthropicApiKey: opts.anthropicApiKey,
     anthropicModel: opts.anthropicModel,
+    cloudProvider: opts.cloudProvider,
+    cloudApiKeys: opts.cloudApiKeys,
+    cloudModels: opts.cloudModels,
+    cloudBaseUrl: opts.cloudBaseUrl,
     signal: opts.signal,
     claimedKeys: opts.claimedKeys,
     pageContext: opts.pageContext,

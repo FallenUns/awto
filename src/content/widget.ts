@@ -1,4 +1,5 @@
 import styles from "./widget.css?inline";
+import { buildAwtoLogoSvg } from "../shared/logo";
 
 export type WidgetHiddenReason = "dismissed" | "filled" | "no-fields" | null;
 
@@ -157,7 +158,7 @@ export function mountWidget(onClick: () => void): WidgetHandle {
     }
     container.innerHTML = `
       <button class="pill fade-in" title="Drag to move · double-click to reset position" aria-label="Open Awto (${currentCount} field${currentCount === 1 ? "" : "s"} detected). Drag to move, double-click to reset position.">
-        <span class="avatar">A</span>
+        <span class="avatar">${buildAwtoLogoSvg({ size: 28, variant: "tile" })}</span>
         <span class="badge">${currentCount}</span>
         <span class="close" role="button" aria-label="Dismiss" tabindex="0">×</span>
       </button>
