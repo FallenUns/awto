@@ -11,7 +11,7 @@ export const LLMSettingsSchema = z.object({
     .max(600000)
     .default(90000),
   anthropicApiKey: z.string().default(""),
-  anthropicModel: z.string().default("claude-opus-4-7"),
+  anthropicModel: z.string().default("claude-opus-4-8"),
   // Non-Anthropic cloud providers (all OpenAI-compatible). Keyed by provider id.
   cloudProvider: z.string().default("anthropic"),
   cloudApiKeys: z.record(z.string()).default({}),

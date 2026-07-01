@@ -6,9 +6,10 @@ import { ModelCatalog } from "./ModelCatalog";
 import { TROUBLESHOOTING_URL } from "./model-catalog";
 
 const ANTHROPIC_MODELS = [
-  "claude-opus-4-7",
-  "claude-sonnet-4-7",
-  "claude-haiku-4-7",
+  "claude-opus-4-8",
+  "claude-sonnet-5",
+  "claude-haiku-4-5",
+  "claude-opus-4-7", // legacy
 ];
 
 // Provider ids match resolveCloud() in background/llm/cloud.ts. Anthropic uses
@@ -23,18 +24,28 @@ interface ProviderDef {
 
 const PROVIDERS: ProviderDef[] = [
   { id: "anthropic", name: "Anthropic", keyPlaceholder: "sk-ant-…", models: ANTHROPIC_MODELS },
-  { id: "openai", name: "OpenAI", keyPlaceholder: "sk-…", models: ["gpt-4o", "gpt-4o-mini", "gpt-4.1"] },
+  {
+    id: "openai",
+    name: "OpenAI",
+    keyPlaceholder: "sk-…",
+    models: ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-4o"], // gpt-4o legacy
+  },
   {
     id: "gemini",
     name: "Google Gemini",
     keyPlaceholder: "AIza…",
-    models: ["gemini-2.5-pro", "gemini-2.5-flash"],
+    models: ["gemini-3.1-pro", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-2.5-pro"], // 2.5-pro legacy
   },
   {
     id: "openrouter",
     name: "OpenRouter",
     keyPlaceholder: "sk-or-…",
-    models: ["anthropic/claude-3.5-sonnet", "openai/gpt-4o", "meta-llama/llama-3.1-70b"],
+    models: [
+      "openai/gpt-5.5",
+      "anthropic/claude-opus-4.8",
+      "google/gemini-3.1-pro",
+      "anthropic/claude-3.5-sonnet", // legacy
+    ],
   },
   {
     id: "custom",
