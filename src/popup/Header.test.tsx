@@ -7,7 +7,7 @@ describe("Header", () => {
     render(<Header status="no-form" />);
     expect(screen.getByText("Awto")).toBeTruthy();
     const avatar = document.querySelector(".awto-header__avatar");
-    expect(avatar?.textContent).toBe("A");
+    expect(avatar?.querySelector("svg")).toBeTruthy();
   });
 
   it("shows 'Reading the form…' pill in scanning status", () => {

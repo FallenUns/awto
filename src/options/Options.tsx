@@ -1,4 +1,6 @@
 import { useRef, useState, type KeyboardEvent } from "react";
+import { User, Cpu, Info } from "lucide-react";
+import { AwtoLogo } from "../shared/AwtoLogo";
 import { ProfileTab } from "./ProfileTab";
 import { LLMTab } from "./LLMTab";
 import { AboutTab } from "./AboutTab";
@@ -6,10 +8,10 @@ import { useOptionsState } from "./useOptionsState";
 
 type TabId = "profile" | "llm" | "about";
 
-const TABS: Array<{ id: TabId; label: string }> = [
-  { id: "profile", label: "Profile" },
-  { id: "llm", label: "LLM" },
-  { id: "about", label: "About" },
+const TABS: Array<{ id: TabId; label: string; icon: typeof User }> = [
+  { id: "profile", label: "Profile", icon: User },
+  { id: "llm", label: "LLM & Models", icon: Cpu },
+  { id: "about", label: "About", icon: Info },
 ];
 
 export function Options() {
@@ -44,11 +46,11 @@ export function Options() {
   }
 
   function handleTabKey(e: KeyboardEvent<HTMLButtonElement>, idx: number) {
-    if (e.key === "ArrowRight") {
+    if (e.key === "ArrowDown" || e.key === "ArrowRight") {
       e.preventDefault();
       const next = TABS[(idx + 1) % TABS.length];
       if (next) focusTab(next.id);
-    } else if (e.key === "ArrowLeft") {
+    } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
       e.preventDefault();
       const next = TABS[(idx - 1 + TABS.length) % TABS.length];
       if (next) focusTab(next.id);
@@ -64,80 +66,99 @@ export function Options() {
   }
 
   return (
-    <div className="awto-options">
-      <header className="awto-options__header">
-        <div>
-          <h1 className="awto-options__brand">Awto</h1>
-          <p className="awto-options__subtitle">Settings</p>
+    <div className="awto-shell">
+      <aside className="awto-sidebar">
+        <div className="awto-sidebar__brand">
+          <AwtoLogo size={38} variant="tile" title="Awto" />
+          <div>
+            <div className="awto-sidebar__name">Awto</div>
+            <div className="awto-sidebar__tag">Settings</div>
+          </div>
         </div>
-      </header>
 
-      <div className="awto-tablist" role="tablist" aria-label="Settings sections">
-        {TABS.map((tab, idx) => (
-          <button
-            key={tab.id}
-            ref={(el) => {
-              tabRefs.current[tab.id] = el;
-            }}
-            type="button"
-            role="tab"
-            id={`tab-${tab.id}`}
-            aria-controls={`panel-${tab.id}`}
-            aria-selected={active === tab.id}
-            tabIndex={active === tab.id ? 0 : -1}
-            className="awto-tab"
-            onClick={() => setActive(tab.id)}
-            onKeyDown={(e) => handleTabKey(e, idx)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+        <nav
+          className="awto-nav"
+          role="tablist"
+          aria-label="Settings sections"
+          aria-orientation="vertical"
+        >
+          {TABS.map((tab, idx) => {
+            const Icon = tab.icon;
+            const selected = active === tab.id;
+            return (
+              <button
+                key={tab.id}
+                ref={(el) => {
+                  tabRefs.current[tab.id] = el;
+                }}
+                type="button"
+                role="tab"
+                id={`tab-${tab.id}`}
+                aria-controls={`panel-${tab.id}`}
+                aria-selected={selected}
+                tabIndex={selected ? 0 : -1}
+                className={`awto-nav__item${selected ? " awto-nav__item--active" : ""}`}
+                onClick={() => setActive(tab.id)}
+                onKeyDown={(e) => handleTabKey(e, idx)}
+              >
+                <Icon size={18} strokeWidth={1.7} aria-hidden="true" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </nav>
 
-      <div
-        role="tabpanel"
-        id="panel-profile"
-        aria-labelledby="tab-profile"
-        hidden={active !== "profile"}
-      >
-        {active === "profile" && loaded && (
-          <ProfileTab
-            profile={profile}
-            saveStatus={profileSaveStatus}
-            onUpdate={updateProfile}
-            onClear={clearProfileField}
-            onAddCustom={addCustomField}
-            onUpdateCustom={updateCustomField}
-            onRemoveCustom={removeCustomField}
-            onReplaceProfile={replaceProfile}
-          />
-        )}
-      </div>
+        <p className="awto-sidebar__foot">
+          Your profile stays in this browser. No telemetry.
+        </p>
+      </aside>
 
-      <div
-        role="tabpanel"
-        id="panel-llm"
-        aria-labelledby="tab-llm"
-        hidden={active !== "llm"}
-      >
-        {active === "llm" && loaded && (
-          <LLMTab
-            settings={llmSettings}
-            saveStatus={llmSaveStatus}
-            onUpdate={updateLLMSettings}
-            onTestOllama={testOllamaConnection}
-          />
-        )}
-      </div>
+      <main className="awto-main">
+        <div
+          role="tabpanel"
+          id="panel-profile"
+          aria-labelledby="tab-profile"
+          hidden={active !== "profile"}
+        >
+          {active === "profile" && loaded && (
+            <ProfileTab
+              profile={profile}
+              saveStatus={profileSaveStatus}
+              onUpdate={updateProfile}
+              onClear={clearProfileField}
+              onAddCustom={addCustomField}
+              onUpdateCustom={updateCustomField}
+              onRemoveCustom={removeCustomField}
+              onReplaceProfile={replaceProfile}
+            />
+          )}
+        </div>
 
-      <div
-        role="tabpanel"
-        id="panel-about"
-        aria-labelledby="tab-about"
-        hidden={active !== "about"}
-      >
-        {active === "about" && <AboutTab />}
-      </div>
+        <div
+          role="tabpanel"
+          id="panel-llm"
+          aria-labelledby="tab-llm"
+          hidden={active !== "llm"}
+        >
+          {active === "llm" && loaded && (
+            <LLMTab
+              settings={llmSettings}
+              saveStatus={llmSaveStatus}
+              onUpdate={updateLLMSettings}
+              onTestOllama={testOllamaConnection}
+            />
+          )}
+        </div>
+
+        <div
+          role="tabpanel"
+          id="panel-about"
+          aria-labelledby="tab-about"
+          hidden={active !== "about"}
+        >
+          {active === "about" && <AboutTab />}
+        </div>
+      </main>
     </div>
   );
 }

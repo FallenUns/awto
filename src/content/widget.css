@@ -31,14 +31,13 @@
 .avatar {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
-  background: #22C55E;
-  color: #0F172A;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
-  font-weight: 600;
+}
+
+.avatar svg {
+  display: block;
 }
 
 .badge {

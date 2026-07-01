@@ -1,5 +1,20 @@
 import { useMemo, useState } from "react";
-import { Plus, X } from "lucide-react";
+import {
+  Plus,
+  X,
+  User,
+  Mail,
+  MapPin,
+  Briefcase,
+  GraduationCap,
+  Lock,
+  Globe,
+  SlidersHorizontal,
+  Eye,
+  EyeOff,
+  Shield,
+  type LucideIcon,
+} from "lucide-react";
 import {
   BUILT_IN_KEYS,
   ProfileSchema,
@@ -31,6 +46,10 @@ interface FieldDef {
 interface SectionDef {
   id: string;
   title: string;
+  subtitle: string;
+  chip: string;
+  icon: LucideIcon;
+  sensitive?: boolean;
   fields: FieldDef[];
 }
 
@@ -38,6 +57,9 @@ const SECTIONS: SectionDef[] = [
   {
     id: "identity",
     title: "Identity",
+    subtitle: "Who you are on forms",
+    chip: "Identity",
+    icon: User,
     fields: [
       {
         key: "title",
@@ -71,6 +93,9 @@ const SECTIONS: SectionDef[] = [
   {
     id: "contact",
     title: "Contact",
+    subtitle: "How forms reach you",
+    chip: "Contact",
+    icon: Mail,
     fields: [
       { key: "email", label: "Email", type: "email", autocomplete: "email" },
       {
@@ -91,6 +116,9 @@ const SECTIONS: SectionDef[] = [
   {
     id: "address",
     title: "Address",
+    subtitle: "Mailing & residential",
+    chip: "Address",
+    icon: MapPin,
     fields: [
       {
         key: "unitNumber",
@@ -119,6 +147,9 @@ const SECTIONS: SectionDef[] = [
   {
     id: "work",
     title: "Work",
+    subtitle: "Employment & links",
+    chip: "Work",
+    icon: Briefcase,
     fields: [
       {
         key: "currentEmployer",
@@ -138,6 +169,9 @@ const SECTIONS: SectionDef[] = [
   {
     id: "education",
     title: "Education",
+    subtitle: "Qualifications",
+    chip: "Education",
+    icon: GraduationCap,
     fields: [
       {
         key: "highestQualification",
@@ -155,6 +189,10 @@ const SECTIONS: SectionDef[] = [
   {
     id: "identification",
     title: "Identification",
+    subtitle: "Sensitive — handled with extra care",
+    chip: "IDs",
+    icon: Lock,
+    sensitive: true,
     fields: [
       {
         key: "taxFileNumber",
@@ -168,6 +206,9 @@ const SECTIONS: SectionDef[] = [
   {
     id: "status",
     title: "Status",
+    subtitle: "Nationality & work rights",
+    chip: "Status",
+    icon: Globe,
     fields: [
       { key: "nationality", label: "Nationality" },
       {
@@ -178,6 +219,8 @@ const SECTIONS: SectionDef[] = [
     ],
   },
 ];
+
+const CHIPS = [...SECTIONS.map((s) => ({ id: s.id, label: s.chip })), { id: "advanced", label: "Advanced" }];
 
 interface ProfileTabProps {
   profile: Profile;
@@ -193,6 +236,10 @@ interface ProfileTabProps {
   onReplaceProfile: (next: Profile) => void;
 }
 
+function isFilled(value: unknown): boolean {
+  return typeof value === "string" && value.trim() !== "";
+}
+
 export function ProfileTab({
   profile,
   saveStatus,
@@ -206,6 +253,7 @@ export function ProfileTab({
   const [showJson, setShowJson] = useState(false);
   const [jsonDraft, setJsonDraft] = useState<string>("");
   const [jsonError, setJsonError] = useState<string | null>(null);
+  const [showSensitive, setShowSensitive] = useState(false);
 
   const [newKey, setNewKey] = useState("");
   const [newValue, setNewValue] = useState("");
@@ -217,6 +265,17 @@ export function ProfileTab({
   );
 
   const builtInKeysSet = new Set<string>(BUILT_IN_KEYS);
+
+  const filledCount = useMemo(
+    () => BUILT_IN_KEYS.filter((k) => isFilled(profile[k])).length,
+    [profile]
+  );
+  const totalCount = BUILT_IN_KEYS.length;
+  const emptyCount = totalCount - filledCount;
+  const pct = Math.round((filledCount / totalCount) * 100);
+  const ringRadius = 26;
+  const ringCirc = 2 * Math.PI * ringRadius;
+  const ringDash = `${((pct / 100) * ringCirc).toFixed(1)} ${ringCirc.toFixed(1)}`;
 
   function handleAddressSelect(a: AddressResult) {
     onUpdate("addressLine1", a.addressLine1);
@@ -265,145 +324,228 @@ export function ProfileTab({
     }
   }
 
-  return (
-    <div className="awto-tabpanel" aria-live="polite">
-      {SECTIONS.map((section) => (
-        <section key={section.id} className="awto-card" aria-labelledby={`section-${section.id}`}>
-          <div className="awto-card__header">
-            <h3 id={`section-${section.id}`} className="awto-section-title">
-              {section.title}
-            </h3>
-            {saveStatus === "saved" && (
-              <span
-                className="awto-badge awto-badge--success awto-badge--saved"
-                aria-live="polite"
-              >
-                Saved
-              </span>
-            )}
-          </div>
-          <div className="awto-field-grid">
-            {section.fields.map((field) => {
-              const id = `profile-${field.key}`;
-              const value = profile[field.key] ?? "";
-              if (field.key === "addressLine1") {
-                return (
-                  <div key={field.key} className="awto-field">
-                    <label className="awto-label" htmlFor={id}>
-                      {field.label}
-                    </label>
-                    <AddressAutocomplete
-                      id={id}
-                      value={value}
-                      onChange={(v) => onUpdate("addressLine1", v)}
-                      onSelect={handleAddressSelect}
-                    />
-                    {field.helper && (
-                      <p className="awto-helper--inline">{field.helper}</p>
-                    )}
-                  </div>
-                );
-              }
-              const enumOptions = ENUM_FIELDS[field.key];
-              if (enumOptions) {
-                const isCustom =
-                  value !== "" && !enumOptions.includes(value);
-                return (
-                  <div key={field.key} className="awto-field">
-                    <label className="awto-label" htmlFor={id}>
-                      {field.label}
-                    </label>
-                    <select
-                      id={id}
-                      className="awto-input"
-                      value={isCustom ? CUSTOM_SENTINEL : value}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        if (v === CUSTOM_SENTINEL) {
-                          if (!isCustom) onUpdate(field.key, " ");
-                          return;
-                        }
-                        onUpdate(field.key, v);
-                      }}
-                    >
-                      <option value="">Choose…</option>
-                      {enumOptions.map((o) => (
-                        <option key={o} value={o}>
-                          {o}
-                        </option>
-                      ))}
-                      <option value={CUSTOM_SENTINEL}>Other…</option>
-                    </select>
-                    {isCustom && (
-                      <input
-                        type="text"
-                        className="awto-input awto-input--custom"
-                        aria-label={`Custom ${field.label}`}
-                        value={value.trim() === "" ? "" : value}
-                        onChange={(e) => onUpdate(field.key, e.target.value)}
-                      />
-                    )}
-                    {field.helper && (
-                      <p className="awto-helper--inline">{field.helper}</p>
-                    )}
-                  </div>
-                );
-              }
-              return (
-                <div key={field.key} className="awto-field">
-                  <label className="awto-label" htmlFor={id}>
-                    {field.label}
-                  </label>
-                  <div className="awto-field__row">
-                    <input
-                      id={id}
-                      className="awto-input"
-                      type={field.type ?? "text"}
-                      autoComplete={field.autocomplete}
-                      placeholder={field.placeholder}
-                      value={value}
-                      onChange={(e) => onUpdate(field.key, e.target.value)}
-                    />
-                    {value !== "" && (
-                      <button
-                        type="button"
-                        className="awto-iconbtn awto-iconbtn--danger"
-                        aria-label={`Clear ${field.label}`}
-                        onClick={() => onClear(field.key)}
-                      >
-                        <X size={16} strokeWidth={1.5} aria-hidden="true" />
-                      </button>
-                    )}
-                  </div>
-                  {field.helper && (
-                    <p className="awto-helper--inline">{field.helper}</p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          {section.id === "address" && (
-            <p className="awto-card__footer-note">
-              Address suggestions powered by OpenStreetMap. Each typed query goes to <code>nominatim.openstreetmap.org</code>. No account, no login.
-            </p>
-          )}
-        </section>
-      ))}
+  function renderField(field: FieldDef, sensitive: boolean) {
+    const id = `profile-${field.key}`;
+    const value = profile[field.key] ?? "";
 
-      <section className="awto-card" aria-labelledby="section-custom">
-        <div className="awto-card__header">
-          <h3 id="section-custom" className="awto-section-title">
-            Custom fields
-          </h3>
-          {saveStatus === "saved" && (
-            <span
-              className="awto-badge awto-badge--success awto-badge--saved"
-              aria-live="polite"
+    if (field.key === "addressLine1") {
+      return (
+        <div key={field.key} className="awto-field">
+          <label className="awto-label" htmlFor={id}>
+            {field.label}
+          </label>
+          <AddressAutocomplete
+            id={id}
+            value={value}
+            onChange={(v) => onUpdate("addressLine1", v)}
+            onSelect={handleAddressSelect}
+          />
+          {field.helper && <p className="awto-helper--inline">{field.helper}</p>}
+        </div>
+      );
+    }
+
+    const enumOptions = ENUM_FIELDS[field.key];
+    if (enumOptions) {
+      const isCustom = value !== "" && !enumOptions.includes(value);
+      return (
+        <div key={field.key} className="awto-field">
+          <label className="awto-label" htmlFor={id}>
+            {field.label}
+          </label>
+          <select
+            id={id}
+            className="awto-input"
+            value={isCustom ? CUSTOM_SENTINEL : value}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === CUSTOM_SENTINEL) {
+                if (!isCustom) onUpdate(field.key, " ");
+                return;
+              }
+              onUpdate(field.key, v);
+            }}
+          >
+            <option value="">Choose…</option>
+            {enumOptions.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+            <option value={CUSTOM_SENTINEL}>Other…</option>
+          </select>
+          {isCustom && (
+            <input
+              type="text"
+              className="awto-input awto-input--custom"
+              aria-label={`Custom ${field.label}`}
+              value={value.trim() === "" ? "" : value}
+              onChange={(e) => onUpdate(field.key, e.target.value)}
+            />
+          )}
+          {field.helper && <p className="awto-helper--inline">{field.helper}</p>}
+        </div>
+      );
+    }
+
+    return (
+      <div key={field.key} className="awto-field">
+        <label className="awto-label" htmlFor={id}>
+          <span>{field.label}</span>
+          {sensitive && <span className="awto-ondevice">ON-DEVICE</span>}
+        </label>
+        <div className="awto-field__row">
+          <input
+            id={id}
+            className={`awto-input${sensitive ? " awto-input--sensitive" : ""}`}
+            type={sensitive && !showSensitive ? "password" : field.type ?? "text"}
+            autoComplete={sensitive ? "off" : field.autocomplete}
+            placeholder={field.placeholder}
+            value={value}
+            spellCheck={sensitive ? false : undefined}
+            onChange={(e) => onUpdate(field.key, e.target.value)}
+          />
+          {value !== "" && (
+            <button
+              type="button"
+              className="awto-iconbtn awto-iconbtn--danger"
+              aria-label={`Clear ${field.label}`}
+              onClick={() => onClear(field.key)}
             >
-              Saved
-            </span>
+              <X size={16} strokeWidth={1.5} aria-hidden="true" />
+            </button>
           )}
         </div>
+        {field.helper && <p className="awto-helper--inline">{field.helper}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="awto-view" aria-live="polite">
+      <div className="awto-profile-head">
+        <div className="awto-profile-head__meta">
+          <div className="awto-ring" aria-hidden="true">
+            <svg width="48" height="48" viewBox="0 0 60 60">
+              <circle
+                cx="30"
+                cy="30"
+                r={ringRadius}
+                fill="none"
+                stroke="rgba(148,163,184,0.16)"
+                strokeWidth="6"
+              />
+              <circle
+                cx="30"
+                cy="30"
+                r={ringRadius}
+                fill="none"
+                stroke="var(--accent)"
+                strokeWidth="6"
+                strokeLinecap="round"
+                strokeDasharray={ringDash}
+                transform="rotate(-90 30 30)"
+              />
+            </svg>
+            <span className="awto-ring__pct">{pct}%</span>
+          </div>
+          <div>
+            <h1 className="awto-view__title">Profile</h1>
+            <p className="awto-view__sub">
+              {pct}% complete · {emptyCount} field{emptyCount === 1 ? "" : "s"} empty
+              {saveStatus === "saved" && (
+                <span className="awto-saved-inline"> · Saved</span>
+              )}
+            </p>
+          </div>
+        </div>
+        <nav className="awto-chips" aria-label="Jump to section">
+          {CHIPS.map((chip) => (
+            <a key={chip.id} className="awto-chip" href={`#${chip.id}`}>
+              {chip.label}
+            </a>
+          ))}
+        </nav>
+      </div>
+
+      {SECTIONS.map((section) => {
+        const Icon = section.icon;
+        return (
+          <section
+            key={section.id}
+            id={section.id}
+            className={`awto-sec${section.sensitive ? " awto-sec--sensitive" : ""}`}
+            aria-labelledby={`section-${section.id}`}
+          >
+            <div className="awto-sec__head">
+              <div
+                className={`awto-sec__icon${section.sensitive ? " awto-sec__icon--amber" : ""}`}
+              >
+                <Icon size={16} strokeWidth={1.8} aria-hidden="true" />
+              </div>
+              <div className="awto-sec__head-text">
+                <h2 id={`section-${section.id}`} className="awto-sec__title">
+                  {section.title}
+                </h2>
+                <p className="awto-sec__sub">{section.subtitle}</p>
+              </div>
+              {section.sensitive && (
+                <button
+                  type="button"
+                  className="awto-reveal"
+                  aria-pressed={showSensitive}
+                  onClick={() => setShowSensitive((s) => !s)}
+                >
+                  {showSensitive ? (
+                    <EyeOff size={15} strokeWidth={1.7} aria-hidden="true" />
+                  ) : (
+                    <Eye size={15} strokeWidth={1.7} aria-hidden="true" />
+                  )}
+                  <span>{showSensitive ? "Hide" : "Show"}</span>
+                </button>
+              )}
+            </div>
+
+            {section.sensitive && (
+              <div className="awto-sensitive-note" role="note">
+                <Shield size={15} strokeWidth={1.9} aria-hidden="true" />
+                <span>
+                  These values never leave this device and are masked by default.
+                  Awto only fills them when a form explicitly asks.
+                </span>
+              </div>
+            )}
+
+            <div className="awto-field-grid">
+              {section.fields.map((field) =>
+                renderField(field, section.sensitive ?? false)
+              )}
+            </div>
+
+            {section.id === "address" && (
+              <p className="awto-card__footer-note">
+                Address suggestions powered by OpenStreetMap. Each typed query goes
+                to <code>nominatim.openstreetmap.org</code>. No account, no login.
+              </p>
+            )}
+          </section>
+        );
+      })}
+
+      <section id="advanced" className="awto-sec" aria-labelledby="section-advanced">
+        <div className="awto-sec__head">
+          <div className="awto-sec__icon">
+            <SlidersHorizontal size={16} strokeWidth={1.8} aria-hidden="true" />
+          </div>
+          <div className="awto-sec__head-text">
+            <h2 id="section-advanced" className="awto-sec__title">
+              Advanced
+            </h2>
+            <p className="awto-sec__sub">Custom fields &amp; raw data</p>
+          </div>
+        </div>
+
+        <h3 className="awto-subhead">Custom fields</h3>
         {customEntries.length === 0 && (
           <p className="awto-helper--inline">
             Add your own fields like "linkedin" or "favouriteColour".
@@ -485,13 +627,10 @@ export function ProfileTab({
             {addError}
           </p>
         )}
-      </section>
 
-      <section className="awto-card" aria-labelledby="section-rawjson">
-        <div className="awto-card__header">
-          <h3 id="section-rawjson" className="awto-section-title">
-            Raw JSON
-          </h3>
+        <hr className="awto-divider" />
+        <div className="awto-rawjson-head">
+          <h3 className="awto-subhead">Raw JSON</h3>
           <button
             type="button"
             className="awto-btn awto-btn--secondary"
@@ -515,11 +654,7 @@ export function ProfileTab({
               aria-invalid={jsonError !== null}
             />
             {jsonError && (
-              <p
-                id="profile-json-error"
-                className="awto-inline-error"
-                role="alert"
-              >
+              <p id="profile-json-error" className="awto-inline-error" role="alert">
                 {jsonError}. Reverted to previous value.
               </p>
             )}

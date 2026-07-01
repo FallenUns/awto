@@ -1,4 +1,5 @@
 import { RefreshCw } from "lucide-react";
+import { AwtoLogo } from "../shared/AwtoLogo";
 import type { FlowStatus } from "./types";
 
 interface HeaderProps {
@@ -25,7 +26,7 @@ export function Header({
   return (
     <header className="awto-header">
       <div className="awto-header__brand">
-        <span className="awto-header__avatar" aria-hidden="true">A</span>
+        <AwtoLogo className="awto-header__avatar" size={20} variant="tile" />
         <span className="awto-header__name">Awto</span>
       </div>
       <span className="awto-header__pill">{pillFor(status, { readyCount, missingCount, skipCount, chunksDone, chunksTotal, filledCount })}</span>
